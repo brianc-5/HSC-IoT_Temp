@@ -1,0 +1,1320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0f1a">
+  <title>TempBridge</title>
+
+  <!-- Production hosting: GitHub Pages or another HTTPS static host. -->
+  <!-- Local fallback: python3 -m http.server 8000, optionally with adb reverse tcp:8000 tcp:8000. -->
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080c14;
+      --surface: #0f1726;
+      --surface-2: #151f31;
+      --border: #26344b;
+      --text: #edf4ff;
+      --muted: #94a3b8;
+      --accent: #44d7b6;
+      --accent-strong: #79f2d6;
+      --blue: #65a9ff;
+      --danger: #ff7b86;
+      --warning: #ffcc66;
+      --shadow: 0 18px 55px rgb(0 0 0 / 0.28);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-width: 300px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(circle at 15% -10%, rgb(68 215 182 / 0.14), transparent 33rem),
+        radial-gradient(circle at 95% 10%, rgb(101 169 255 / 0.09), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      width: min(1100px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: max(28px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(1.45rem, 4vw, 2rem);
+      letter-spacing: -0.035em;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    h2 {
+      font-size: 0.88rem;
+      font-weight: 650;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .connection-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .connection-state span:last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .state-dot {
+      width: 10px;
+      height: 10px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: var(--muted);
+      box-shadow: 0 0 0 4px rgb(148 163 184 / 0.09);
+    }
+
+    .state-dot.connected {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgb(68 215 182 / 0.11), 0 0 18px rgb(68 215 182 / 0.45);
+    }
+
+    .state-dot.busy {
+      background: var(--warning);
+      box-shadow: 0 0 0 4px rgb(255 204 102 / 0.11);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .state-dot.error {
+      background: var(--danger);
+      box-shadow: 0 0 0 4px rgb(255 123 134 / 0.1);
+    }
+
+    @keyframes pulse {
+      50% { opacity: 0.42; }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.82fr) minmax(320px, 1.18fr);
+      gap: 18px;
+    }
+
+    .card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: linear-gradient(145deg, rgb(21 31 49 / 0.96), rgb(12 19 31 / 0.96));
+      box-shadow: var(--shadow);
+    }
+
+    .live-card {
+      display: flex;
+      min-height: 330px;
+      flex-direction: column;
+      padding: 24px;
+    }
+
+    .temperature {
+      margin: auto 0 4px;
+      font-size: clamp(4.3rem, 14vw, 7.4rem);
+      font-weight: 700;
+      line-height: 0.95;
+      letter-spacing: -0.075em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .temperature .unit {
+      margin-left: 0.12em;
+      font-size: 0.31em;
+      font-weight: 550;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      vertical-align: top;
+    }
+
+    .live-caption {
+      min-height: 1.4em;
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .live-details {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .metric {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid rgb(38 52 75 / 0.75);
+      border-radius: 12px;
+      background: rgb(8 12 20 / 0.35);
+    }
+
+    .metric-label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      display: block;
+      overflow: hidden;
+      font-size: 1rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .side-stack {
+      display: grid;
+      align-content: start;
+      gap: 18px;
+    }
+
+    .controls-card,
+    .status-card {
+      padding: 22px;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    button {
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+    }
+
+    button.primary {
+      border-color: rgb(68 215 182 / 0.58);
+      background: rgb(68 215 182 / 0.13);
+      color: var(--accent-strong);
+    }
+
+    button:not(:disabled):active {
+      transform: translateY(1px);
+    }
+
+    button:not(:disabled):hover {
+      border-color: var(--accent);
+    }
+
+    button:focus-visible {
+      outline: 3px solid rgb(101 169 255 / 0.35);
+      outline-offset: 2px;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.42;
+    }
+
+    .sync-progress {
+      min-height: 1.35em;
+      margin-top: 13px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .status-item {
+      min-width: 0;
+      padding: 11px 9px;
+      border-radius: 11px;
+      background: rgb(8 12 20 / 0.38);
+      text-align: center;
+    }
+
+    .status-item strong,
+    .status-item span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .status-item strong {
+      margin-bottom: 5px;
+      font-size: 0.92rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-item span {
+      color: var(--muted);
+      font-size: 0.66rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .notice,
+    .error-message {
+      display: none;
+      margin-bottom: 18px;
+      padding: 13px 15px;
+      border: 1px solid;
+      border-radius: 12px;
+      line-height: 1.45;
+      font-size: 0.87rem;
+    }
+
+    .notice.visible,
+    .error-message.visible {
+      display: block;
+    }
+
+    .notice {
+      border-color: rgb(255 204 102 / 0.4);
+      background: rgb(255 204 102 / 0.08);
+      color: #ffe0a0;
+    }
+
+    .error-message {
+      border-color: rgb(255 123 134 / 0.42);
+      background: rgb(255 123 134 / 0.08);
+      color: #ffc0c5;
+    }
+
+    .history-card {
+      margin-top: 18px;
+      padding: 22px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .record-count {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 330px;
+    }
+
+    .chart-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .chart-fallback.visible {
+      display: grid;
+    }
+
+    .table-card {
+      margin-top: 18px;
+      padding: 22px 0 0;
+    }
+
+    .table-card .section-heading {
+      padding: 0 22px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-top: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th,
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgb(38 52 75 / 0.58);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child,
+    td:first-child {
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.69rem;
+      font-weight: 650;
+      letter-spacing: 0.055em;
+      text-transform: uppercase;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .empty-row td {
+      height: 86px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .live-card {
+        min-height: 300px;
+      }
+
+      .buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .status-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .status-item:last-child {
+        grid-column: span 2;
+      }
+
+      .chart-wrap {
+        height: 285px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Temp<span>Bridge</span></h1>
+      <div class="connection-state" role="status" aria-live="polite">
+        <span id="stateDot" class="state-dot"></span>
+        <span id="connectionText">Not connected</span>
+      </div>
+    </header>
+
+    <div id="featureNotice" class="notice" role="alert"></div>
+    <div id="errorMessage" class="error-message" role="alert" aria-live="assertive"></div>
+
+    <section class="grid" aria-label="Current reading and bridge controls">
+      <article class="card live-card">
+        <h2>Current temperature</h2>
+        <div class="temperature"><span id="temperatureValue">--.--</span><span class="unit">°C</span></div>
+        <p id="liveCaption" class="live-caption">Connect to see the latest sample.</p>
+        <div class="live-details">
+          <div class="metric">
+            <span class="metric-label">Supply</span>
+            <span id="voltageValue" class="metric-value">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Sequence</span>
+            <span id="sequenceValue" class="metric-value">—</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">RSSI</span>
+            <span id="rssiValue" class="metric-value">—</span>
+          </div>
+        </div>
+      </article>
+
+      <div class="side-stack">
+        <article class="card controls-card">
+          <h2>Actions</h2>
+          <div class="buttons">
+            <button id="connectButton" class="primary" type="button">Connect</button>
+            <button id="syncButton" type="button" disabled>Sync history</button>
+            <button id="exportButton" type="button" disabled>Export CSV</button>
+          </div>
+          <p id="syncProgress" class="sync-progress" aria-live="polite">History has not been synced.</p>
+        </article>
+
+        <article class="card status-card">
+          <h2>Bridge status</h2>
+          <div class="status-grid">
+            <div class="status-item"><strong id="statusRecords">—</strong><span>Records</span></div>
+            <div class="status-item"><strong id="statusAge">—</strong><span>Last age</span></div>
+            <div class="status-item"><strong id="statusRssi">—</strong><span>Last RSSI</span></div>
+            <div class="status-item"><strong id="statusClock">—</strong><span>Clock</span></div>
+            <div class="status-item"><strong id="statusFirmware">—</strong><span>Firmware</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="card history-card" aria-labelledby="chartTitle">
+      <div class="section-heading">
+        <h2 id="chartTitle">History</h2>
+        <span id="recordCount" class="record-count">0 records held</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="historyChart" aria-label="Temperature and voltage history chart"></canvas>
+        <p id="chartFallback" class="chart-fallback">Sync history to populate the chart.</p>
+      </div>
+    </section>
+
+    <section class="card table-card" aria-labelledby="tableTitle">
+      <div class="section-heading">
+        <h2 id="tableTitle">Recent records</h2>
+        <span class="record-count">Latest 50</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Time</th>
+              <th scope="col">Seq</th>
+              <th scope="col">Temperature</th>
+              <th scope="col">Voltage</th>
+              <th scope="col">RSSI</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr class="empty-row"><td colspan="5">No history loaded.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script>
+    'use strict';
+
+    // UUIDs and binary layouts are the immutable bridge protocol contract.
+    const UUIDS = Object.freeze({
+      service:  '8f0e0001-9d7d-4d5a-9f2b-3c4a5b6c7d8e',
+      live:     '8f0e0002-9d7d-4d5a-9f2b-3c4a5b6c7d8e',
+      histCtrl: '8f0e0003-9d7d-4d5a-9f2b-3c4a5b6c7d8e',
+      histData: '8f0e0004-9d7d-4d5a-9f2b-3c4a5b6c7d8e',
+      timesync: '8f0e0005-9d7d-4d5a-9f2b-3c4a5b6c7d8e',
+      status:   '8f0e0006-9d7d-4d5a-9f2b-3c4a5b6c7d8e'
+    });
+
+    const RECORD_BYTES = 12;
+    const HISTORY_END_MARKER = 0xff;
+    const HISTORY_REQUEST = 0x01;
+    const HISTORY_STALL_TIMEOUT_MS = 15000;
+
+    const ui = {
+      stateDot: document.querySelector('#stateDot'),
+      connectionText: document.querySelector('#connectionText'),
+      featureNotice: document.querySelector('#featureNotice'),
+      errorMessage: document.querySelector('#errorMessage'),
+      connectButton: document.querySelector('#connectButton'),
+      syncButton: document.querySelector('#syncButton'),
+      exportButton: document.querySelector('#exportButton'),
+      syncProgress: document.querySelector('#syncProgress'),
+      temperatureValue: document.querySelector('#temperatureValue'),
+      voltageValue: document.querySelector('#voltageValue'),
+      sequenceValue: document.querySelector('#sequenceValue'),
+      rssiValue: document.querySelector('#rssiValue'),
+      liveCaption: document.querySelector('#liveCaption'),
+      statusRecords: document.querySelector('#statusRecords'),
+      statusAge: document.querySelector('#statusAge'),
+      statusRssi: document.querySelector('#statusRssi'),
+      statusClock: document.querySelector('#statusClock'),
+      statusFirmware: document.querySelector('#statusFirmware'),
+      recordCount: document.querySelector('#recordCount'),
+      historyBody: document.querySelector('#historyBody'),
+      chartFallback: document.querySelector('#chartFallback'),
+      chartCanvas: document.querySelector('#historyChart')
+    };
+
+    const ble = {
+      device: null,
+      server: null,
+      characteristics: null,
+      ready: false,
+      pickerOnNextAttempt: false,
+      connecting: false,
+      historyNotificationsStarted: false,
+      connectionGeneration: 0
+    };
+
+    // The Map supplies seq-keyed idempotence; historyRecords is the sorted array
+    // used by the chart, table, incremental request boundary, and CSV export.
+    const recordsBySeq = new Map();
+    let historyRecords = [];
+    let historyInitialized = false;
+    let latestLiveRecord = null;
+    let activeSync = null;
+    let historyChart = null;
+    let lastBridgeRecordCount = null;
+
+    const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    function asDataView(value) {
+      if (value instanceof DataView) return value;
+      if (value instanceof ArrayBuffer) return new DataView(value);
+      if (ArrayBuffer.isView(value)) {
+        return new DataView(value.buffer, value.byteOffset, value.byteLength);
+      }
+      throw new TypeError('Expected binary data from the bridge.');
+    }
+
+    function parseRecord(value, offset = 0) {
+      const view = asDataView(value);
+      if (offset < 0 || offset + RECORD_BYTES > view.byteLength) {
+        throw new RangeError(`Incomplete record: need ${RECORD_BYTES} bytes at offset ${offset}.`);
+      }
+
+      // Every multi-byte field uses an explicit true littleEndian argument.
+      const epochTs = view.getUint32(offset + 0, true);
+      const seq = view.getUint16(offset + 4, true);
+      const tempCenti = view.getInt16(offset + 6, true);
+      const vbatMv = view.getUint16(offset + 8, true);
+      const rssi = view.getInt8(offset + 10);
+      const flags = view.getUint8(offset + 11);
+
+      return Object.freeze({
+        epochTs,
+        seq,
+        tempCenti,
+        tempC: tempCenti / 100,
+        vbatMv,
+        rssi,
+        flags
+      });
+    }
+
+    function parseStatus(value) {
+      const view = asDataView(value);
+      if (view.byteLength !== 11) {
+        throw new RangeError(`Invalid STATUS length: expected 11 bytes, received ${view.byteLength}.`);
+      }
+
+      return Object.freeze({
+        recordCount: view.getUint32(0, true),
+        lastSampleAgeS: view.getUint32(4, true),
+        lastRssi: view.getInt8(8),
+        flags: view.getUint8(9),
+        fwVersion: view.getUint8(10)
+      });
+    }
+
+    function uint32LE(value) {
+      const buffer = new ArrayBuffer(4);
+      new DataView(buffer).setUint32(0, value, true);
+      return buffer;
+    }
+
+    function historyRequestPayload(sinceEpoch) {
+      const buffer = new ArrayBuffer(5);
+      const view = new DataView(buffer);
+      view.setUint8(0, HISTORY_REQUEST);
+      view.setUint32(1, sinceEpoch, true);
+      return buffer;
+    }
+
+    async function writeCharacteristic(characteristic, value) {
+      // Prefer an acknowledged GATT write. writeValue() keeps compatibility
+      // with Chrome versions predating the split write methods.
+      if (typeof characteristic.writeValueWithResponse === 'function') {
+        await characteristic.writeValueWithResponse(value);
+      } else {
+        await characteristic.writeValue(value);
+      }
+    }
+
+    function isConnected() {
+      return Boolean(ble.ready && ble.device && ble.device.gatt && ble.device.gatt.connected);
+    }
+
+    function setConnectionState(kind, text) {
+      ui.stateDot.className = `state-dot${kind ? ` ${kind}` : ''}`;
+      ui.connectionText.textContent = text;
+    }
+
+    function showError(message) {
+      ui.errorMessage.textContent = message;
+      ui.errorMessage.classList.add('visible');
+    }
+
+    function clearError() {
+      ui.errorMessage.textContent = '';
+      ui.errorMessage.classList.remove('visible');
+    }
+
+    function describeError(error) {
+      const name = error && error.name ? error.name : 'Error';
+      const detail = error && error.message ? error.message : String(error);
+
+      if (name === 'NotFoundError') return 'No bridge was selected.';
+      if (name === 'SecurityError') return `Bluetooth permission or secure-context error: ${detail}`;
+      if (name === 'NetworkError') return `Bluetooth connection error: ${detail}`;
+      if (name === 'NotSupportedError') return `This Bluetooth operation is not supported: ${detail}`;
+      return `${name}: ${detail}`;
+    }
+
+    function updateButtonStates() {
+      const supported = 'bluetooth' in navigator && window.isSecureContext;
+      const connected = isConnected();
+      const syncing = Boolean(activeSync);
+
+      ui.connectButton.disabled = !supported || ble.connecting || connected || syncing;
+      ui.syncButton.disabled = !connected || ble.connecting || syncing;
+      // Export is local-only and remains useful after the bridge disconnects.
+      ui.exportButton.disabled = syncing || historyRecords.length === 0;
+
+      if (ble.connecting) {
+        ui.connectButton.textContent = 'Connecting…';
+      } else if (connected) {
+        ui.connectButton.textContent = 'Connected';
+      } else if (ble.device && !ble.pickerOnNextAttempt) {
+        ui.connectButton.textContent = 'Reconnect';
+      } else {
+        ui.connectButton.textContent = 'Connect';
+      }
+
+      if (syncing) {
+        ui.syncButton.textContent = `Syncing… ${activeSync.received}`;
+      } else {
+        ui.syncButton.textContent = 'Sync history';
+      }
+    }
+
+    function formatAge(seconds) {
+      if (seconds === 0xffffffff) return 'Never';
+      if (seconds < 60) return `${seconds}s`;
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+      return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+    }
+
+    function formatRecordTime(epochTs) {
+      return epochTs === 0 ? 'Unsynced' : dateTimeFormatter.format(new Date(epochTs * 1000));
+    }
+
+    function renderStatus(status) {
+      ui.statusRecords.textContent = status.recordCount.toLocaleString();
+      ui.statusAge.textContent = formatAge(status.lastSampleAgeS);
+      ui.statusRssi.textContent = status.recordCount === 0 ? '—' : `${status.lastRssi} dBm`;
+      ui.statusClock.textContent = (status.flags & 0x01) !== 0 ? 'Synced' : 'Unsynced';
+      ui.statusFirmware.textContent = `v${status.fwVersion}`;
+    }
+
+    function renderLive(record, source = 'notification') {
+      latestLiveRecord = record;
+      ui.temperatureValue.textContent = record.tempC.toFixed(2);
+      ui.voltageValue.textContent = `${(record.vbatMv / 1000).toFixed(3)} V`;
+      ui.sequenceValue.textContent = record.seq.toString();
+      ui.rssiValue.textContent = `${record.rssi} dBm`;
+      const arrival = new Date().toLocaleTimeString();
+      ui.liveCaption.textContent = `${source === 'read' ? 'Read' : 'Arrived'} at ${arrival}`;
+    }
+
+    function sortHistoryRecords() {
+      historyRecords = Array.from(recordsBySeq.values()).sort((a, b) => {
+        if (a.epochTs !== b.epochTs) return a.epochTs - b.epochTs;
+        return a.seq - b.seq;
+      });
+    }
+
+    function mergeRecords(records) {
+      for (const record of records) recordsBySeq.set(record.seq, record);
+      sortHistoryRecords();
+    }
+
+    function resetHeldHistory(message) {
+      recordsBySeq.clear();
+      historyRecords = [];
+      historyInitialized = false;
+      latestLiveRecord = null;
+      lastBridgeRecordCount = null;
+      ui.temperatureValue.textContent = '--.--';
+      ui.voltageValue.textContent = '—';
+      ui.sequenceValue.textContent = '—';
+      ui.rssiValue.textContent = '—';
+      ui.liveCaption.textContent = 'Waiting for a current sample from this bridge.';
+      ui.syncProgress.textContent = message;
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const total = historyRecords.length;
+      ui.recordCount.textContent = `${total.toLocaleString()} ${total === 1 ? 'record' : 'records'} held`;
+
+      const recent = historyRecords.slice(-50).reverse();
+      ui.historyBody.replaceChildren();
+
+      if (recent.length === 0) {
+        const row = document.createElement('tr');
+        row.className = 'empty-row';
+        const cell = document.createElement('td');
+        cell.colSpan = 5;
+        cell.textContent = 'No history loaded.';
+        row.append(cell);
+        ui.historyBody.append(row);
+      } else {
+        const fragment = document.createDocumentFragment();
+        for (const record of recent) {
+          const row = document.createElement('tr');
+          const values = [
+            formatRecordTime(record.epochTs),
+            record.seq.toString(),
+            `${record.tempC.toFixed(2)} °C`,
+            `${record.vbatMv} mV`,
+            `${record.rssi} dBm`
+          ];
+          values.forEach((value) => {
+            const cell = document.createElement('td');
+            cell.textContent = value;
+            row.append(cell);
+          });
+          fragment.append(row);
+        }
+        ui.historyBody.append(fragment);
+      }
+
+      renderChart();
+      updateButtonStates();
+    }
+
+    function initChart() {
+      if (typeof Chart === 'undefined') {
+        ui.chartCanvas.hidden = true;
+        ui.chartFallback.textContent = 'Chart.js did not load. The table and CSV export remain available.';
+        ui.chartFallback.classList.add('visible');
+        return;
+      }
+
+      historyChart = new Chart(ui.chartCanvas, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 'Temperature (°C)',
+              data: [],
+              parsing: false,
+              borderColor: '#44d7b6',
+              backgroundColor: 'rgba(68, 215, 182, 0.12)',
+              pointRadius: 1.6,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.18,
+              yAxisID: 'temperature'
+            },
+            {
+              label: 'Voltage (V)',
+              data: [],
+              parsing: false,
+              borderColor: '#65a9ff',
+              backgroundColor: 'rgba(101, 169, 255, 0.10)',
+              pointRadius: 1.6,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.18,
+              hidden: true,
+              yAxisID: 'voltage'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          interaction: { intersect: false, mode: 'nearest' },
+          normalized: true,
+          plugins: {
+            legend: {
+              labels: { color: '#b5c1d3', usePointStyle: true, boxWidth: 8 }
+            },
+            tooltip: {
+              callbacks: {
+                title(items) {
+                  if (items.length === 0) return '';
+                  const epochMs = items[0].parsed.x;
+                  return epochMs === 0 ? 'Unsynced timestamp' : new Date(epochMs).toLocaleString();
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              grid: { color: 'rgba(148, 163, 184, 0.08)' },
+              border: { color: 'rgba(148, 163, 184, 0.22)' },
+              ticks: {
+                color: '#94a3b8',
+                maxRotation: 0,
+                callback(value) {
+                  return Number(value) === 0
+                    ? 'Unsynced'
+                    : new Date(Number(value)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+              }
+            },
+            temperature: {
+              position: 'left',
+              title: { display: true, text: '°C', color: '#94a3b8' },
+              grid: { color: 'rgba(148, 163, 184, 0.08)' },
+              border: { color: 'rgba(148, 163, 184, 0.22)' },
+              ticks: { color: '#94a3b8' }
+            },
+            voltage: {
+              position: 'right',
+              title: { display: true, text: 'V', color: '#94a3b8' },
+              grid: { drawOnChartArea: false },
+              border: { color: 'rgba(148, 163, 184, 0.22)' },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderChart() {
+      if (!historyChart) {
+        if (typeof Chart !== 'undefined') initChart();
+        if (!historyChart) return;
+      }
+
+      ui.chartFallback.classList.toggle('visible', historyRecords.length === 0);
+      ui.chartFallback.textContent = 'Sync history to populate the chart.';
+
+      historyChart.data.datasets[0].data = historyRecords.map((record) => ({
+        x: record.epochTs * 1000,
+        y: record.tempC
+      }));
+      historyChart.data.datasets[1].data = historyRecords.map((record) => ({
+        x: record.epochTs * 1000,
+        y: record.vbatMv / 1000
+      }));
+      historyChart.update('none');
+    }
+
+    function resetStatusDisplay() {
+      ui.statusRecords.textContent = '—';
+      ui.statusAge.textContent = '—';
+      ui.statusRssi.textContent = '—';
+      ui.statusClock.textContent = '—';
+      ui.statusFirmware.textContent = '—';
+    }
+
+    function removeCharacteristicListeners() {
+      if (!ble.characteristics) return;
+      ble.characteristics.live.removeEventListener('characteristicvaluechanged', handleLiveNotification);
+      ble.characteristics.histData.removeEventListener('characteristicvaluechanged', handleHistoryNotification);
+    }
+
+    function clearGattState() {
+      removeCharacteristicListeners();
+      ble.server = null;
+      ble.characteristics = null;
+      ble.ready = false;
+      ble.historyNotificationsStarted = false;
+    }
+
+    function abortActiveSync(error) {
+      if (!activeSync || activeSync.settled) return;
+      activeSync.settled = true;
+      window.clearTimeout(activeSync.watchdog);
+      activeSync.reject(error);
+    }
+
+    function handleDisconnected(event) {
+      if (event.target !== ble.device) return;
+      ble.connectionGeneration += 1;
+      abortActiveSync(new Error('The bridge disconnected during history sync.'));
+      clearGattState();
+      setConnectionState('error', `${ble.device.name || 'TempBridge'} disconnected`);
+      ui.liveCaption.textContent = 'Connection lost. Tap Reconnect to use the same bridge.';
+      showError('The Bluetooth connection was lost. Move closer to the bridge and tap Reconnect.');
+      updateButtonStates();
+    }
+
+    function handleLiveNotification(event) {
+      try {
+        const value = event.target.value;
+        if (!value || value.byteLength !== RECORD_BYTES) {
+          throw new RangeError(`Invalid LIVE length: expected ${RECORD_BYTES} bytes, received ${value ? value.byteLength : 0}.`);
+        }
+        const record = parseRecord(value);
+        renderLive(record, 'notification');
+
+        // Do not seed an initial incremental history boundary with LIVE: doing so
+        // would skip every older bridge record on the first sync. Preserve every
+        // LIVE sample that arrives during a transfer and merge it only after the
+        // history end marker, so a long small-MTU transfer cannot create a gap.
+        if (activeSync) {
+          activeSync.liveRecordsBySeq.set(record.seq, record);
+        } else if (historyInitialized) {
+          mergeRecords([record]);
+          renderHistory();
+        }
+      } catch (error) {
+        showError(`Could not parse a live sample. ${describeError(error)}`);
+      }
+    }
+
+    function resetSyncWatchdog(sync) {
+      window.clearTimeout(sync.watchdog);
+      sync.watchdog = window.setTimeout(() => {
+        if (activeSync !== sync || sync.settled) return;
+        sync.settled = true;
+        sync.reject(new Error('History transfer stalled for 15 seconds. Try syncing again.'));
+      }, HISTORY_STALL_TIMEOUT_MS);
+    }
+
+    function handleHistoryNotification(event) {
+      const sync = activeSync;
+      if (!sync || sync.settled) return;
+
+      try {
+        const view = asDataView(event.target.value);
+        resetSyncWatchdog(sync);
+
+        if (view.byteLength === 1 && view.getUint8(0) === HISTORY_END_MARKER) {
+          sync.settled = true;
+          window.clearTimeout(sync.watchdog);
+          sync.resolve();
+          return;
+        }
+
+        if (view.byteLength < 1) throw new RangeError('Received an empty HIST_DATA notification.');
+        const count = view.getUint8(0);
+        const expectedLength = 1 + count * RECORD_BYTES;
+        if (view.byteLength !== expectedLength) {
+          throw new RangeError(`Malformed HIST_DATA batch: count ${count} requires ${expectedLength} bytes, received ${view.byteLength}.`);
+        }
+
+        for (let index = 0; index < count; index += 1) {
+          const record = parseRecord(view, 1 + index * RECORD_BYTES);
+          sync.recordsBySeq.set(record.seq, record);
+        }
+        sync.received += count;
+        ui.syncProgress.textContent = `Receiving history · ${sync.received.toLocaleString()} records received`;
+        updateButtonStates();
+      } catch (error) {
+        sync.settled = true;
+        window.clearTimeout(sync.watchdog);
+        sync.reject(error);
+      }
+    }
+
+    async function readAndRenderStatus() {
+      if (!ble.characteristics) throw new Error('Bridge characteristics are unavailable.');
+      const value = await ble.characteristics.status.readValue();
+      const status = parseStatus(value);
+
+      // A lower count than previously observed indicates the v1 bridge likely
+      // rebooted and cleared its RAM history. Drop stale page data so the next
+      // sync starts at epoch 0 instead of skipping the new boot's records.
+      if (lastBridgeRecordCount !== null && status.recordCount < lastBridgeRecordCount) {
+        resetHeldHistory('Bridge restart detected; local history was reset.');
+      }
+      lastBridgeRecordCount = status.recordCount;
+      renderStatus(status);
+      return status;
+    }
+
+    async function initializeGatt(server, generation) {
+      const service = await server.getPrimaryService(UUIDS.service);
+      const [live, histCtrl, histData, timesync, status] = await Promise.all([
+        service.getCharacteristic(UUIDS.live),
+        service.getCharacteristic(UUIDS.histCtrl),
+        service.getCharacteristic(UUIDS.histData),
+        service.getCharacteristic(UUIDS.timesync),
+        service.getCharacteristic(UUIDS.status)
+      ]);
+
+      if (generation !== ble.connectionGeneration) throw new Error('Connection was superseded.');
+
+      ble.characteristics = { live, histCtrl, histData, timesync, status };
+      live.addEventListener('characteristicvaluechanged', handleLiveNotification);
+      histData.addEventListener('characteristicvaluechanged', handleHistoryNotification);
+
+      // The required post-connect order is time sync, status, LIVE subscription,
+      // then one initial LIVE read.
+      const nowEpoch = Math.floor(Date.now() / 1000);
+      await writeCharacteristic(timesync, uint32LE(nowEpoch));
+      const bridgeStatus = await readAndRenderStatus();
+      await live.startNotifications();
+      const liveValue = await live.readValue();
+
+      // A zero-filled characteristic before the first sample is not a reading.
+      if (bridgeStatus.recordCount > 0) {
+        if (liveValue.byteLength !== RECORD_BYTES) {
+          throw new RangeError(`Invalid initial LIVE length: expected ${RECORD_BYTES} bytes, received ${liveValue.byteLength}.`);
+        }
+        renderLive(parseRecord(liveValue), 'read');
+      } else {
+        ui.liveCaption.textContent = 'Connected; waiting for the first sensor sample.';
+      }
+    }
+
+    async function connect() {
+      if (!('bluetooth' in navigator) || !window.isSecureContext || ble.connecting || isConnected()) return;
+
+      clearError();
+      ble.connecting = true;
+      ble.ready = false;
+      const useExistingDevice = Boolean(ble.device && !ble.pickerOnNextAttempt);
+      setConnectionState('busy', useExistingDevice ? 'Reconnecting…' : 'Choose TempBridge…');
+      updateButtonStates();
+
+      try {
+        if (!useExistingDevice) {
+          const selectedDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [UUIDS.service] }]
+          });
+
+          const changedDevice = Boolean(ble.device && ble.device.id !== selectedDevice.id);
+          if (ble.device) ble.device.removeEventListener('gattserverdisconnected', handleDisconnected);
+          ble.device = selectedDevice;
+          ble.pickerOnNextAttempt = false;
+          ble.device.addEventListener('gattserverdisconnected', handleDisconnected);
+          if (changedDevice) resetHeldHistory('A different bridge was selected; local history was reset.');
+        }
+
+        const generation = ++ble.connectionGeneration;
+        const server = await ble.device.gatt.connect();
+        ble.server = server;
+        await initializeGatt(server, generation);
+
+        if (generation !== ble.connectionGeneration || !server.connected) {
+          throw new Error('Bridge disconnected while finishing setup.');
+        }
+
+        ble.ready = true;
+        setConnectionState('connected', `Connected to ${ble.device.name || 'TempBridge'}`);
+      } catch (error) {
+        const detail = describeError(error);
+        clearGattState();
+
+        if (ble.device && ble.device.gatt && ble.device.gatt.connected) {
+          // A partial setup is not usable; disconnect so the next attempt starts cleanly.
+          ble.device.gatt.disconnect();
+        }
+
+        // A failed same-device retry gets one-click access to the picker next time.
+        if (useExistingDevice) ble.pickerOnNextAttempt = true;
+        setConnectionState('error', 'Connection failed');
+        showError(`${detail}${useExistingDevice ? ' Tap Connect again to choose a bridge.' : ''}`);
+      } finally {
+        ble.connecting = false;
+        updateButtonStates();
+      }
+    }
+
+    function newestHeldEpoch() {
+      let newest = 0;
+      for (const record of historyRecords) newest = Math.max(newest, record.epochTs);
+      return newest;
+    }
+
+    async function syncHistory() {
+      if (!isConnected() || activeSync) return;
+
+      clearError();
+      const sinceEpoch = historyRecords.length === 0 ? 0 : newestHeldEpoch() + 1;
+      const sync = {
+        sinceEpoch,
+        received: 0,
+        recordsBySeq: new Map(),
+        liveRecordsBySeq: new Map(),
+        heldBefore: recordsBySeq.size,
+        committed: false,
+        watchdog: 0,
+        settled: false,
+        resolve: null,
+        reject: null
+      };
+
+      const completion = new Promise((resolve, reject) => {
+        sync.resolve = resolve;
+        sync.reject = reject;
+      });
+
+      activeSync = sync;
+      ui.syncProgress.textContent = sinceEpoch === 0
+        ? 'Requesting all bridge history…'
+        : `Requesting records after ${new Date((sinceEpoch - 1) * 1000).toLocaleString()}…`;
+      setConnectionState('busy', 'Syncing history…');
+      updateButtonStates();
+
+      try {
+        if (!ble.historyNotificationsStarted) {
+          await ble.characteristics.histData.startNotifications();
+          ble.historyNotificationsStarted = true;
+        }
+
+        await writeCharacteristic(ble.characteristics.histCtrl, historyRequestPayload(sinceEpoch));
+        if (!sync.settled) resetSyncWatchdog(sync);
+        await completion;
+
+        mergeRecords(sync.recordsBySeq.values());
+        mergeRecords(sync.liveRecordsBySeq.values());
+        historyInitialized = true;
+
+        // Include the current LIVE value after the first full sync; this never
+        // influences the initial since_epoch boundary and covers a sample that
+        // arrived while the history stream was in flight.
+        if (latestLiveRecord) mergeRecords([latestLiveRecord]);
+
+        sync.committed = true;
+        renderHistory();
+
+        try {
+          await readAndRenderStatus();
+        } catch (statusError) {
+          showError(`History synced, but STATUS refresh failed. ${describeError(statusError)}`);
+        }
+      } catch (error) {
+        showError(`History sync failed. ${describeError(error)}`);
+        ui.syncProgress.textContent = `Sync interrupted after ${sync.received.toLocaleString()} records; partial data was not merged.`;
+      } finally {
+        window.clearTimeout(sync.watchdog);
+        if (sync.committed) {
+          // LIVE can fire while the post-sync STATUS read is in flight. Merge
+          // the transfer-side map once more before clearing activeSync so that
+          // even that narrow window remains lossless.
+          mergeRecords(sync.liveRecordsBySeq.values());
+          if (latestLiveRecord) mergeRecords([latestLiveRecord]);
+          renderHistory();
+          const changed = Math.max(0, recordsBySeq.size - sync.heldBefore);
+          ui.syncProgress.textContent = `Sync complete · ${sync.received.toLocaleString()} received · ${changed.toLocaleString()} new · ${historyRecords.length.toLocaleString()} total`;
+        }
+        if (activeSync === sync) activeSync = null;
+        if (isConnected()) {
+          setConnectionState('connected', `Connected to ${ble.device.name || 'TempBridge'}`);
+        }
+        updateButtonStates();
+      }
+    }
+
+    function csvEscape(value) {
+      const text = String(value);
+      return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    }
+
+    function exportCsv() {
+      if (activeSync || historyRecords.length === 0) return;
+
+      try {
+        const rows = ['timestamp_iso,seq,temp_c,vbat_mv,rssi'];
+        for (const record of historyRecords) {
+          const timestamp = record.epochTs === 0 ? '' : new Date(record.epochTs * 1000).toISOString();
+          rows.push([
+            timestamp,
+            record.seq,
+            record.tempC.toFixed(2),
+            record.vbatMv,
+            record.rssi
+          ].map(csvEscape).join(','));
+        }
+
+        const blob = new Blob([`${rows.join('\r\n')}\r\n`], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        const stamp = new Date().toISOString().replaceAll(':', '-').replace(/\.\d{3}Z$/, 'Z');
+        anchor.href = url;
+        anchor.download = `tempbridge-${stamp}.csv`;
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (error) {
+        showError(`CSV export failed. ${describeError(error)}`);
+      }
+    }
+
+    function detectBluetoothSupport() {
+      if (!window.isSecureContext) {
+        ui.featureNotice.textContent = 'Web Bluetooth requires HTTPS, such as GitHub Pages, or a localhost development URL. A plain HTTP LAN address is not secure.';
+        ui.featureNotice.classList.add('visible');
+        setConnectionState('error', 'Secure context required');
+      } else if (!('bluetooth' in navigator)) {
+        ui.featureNotice.textContent = 'Web Bluetooth is unavailable in this browser. Open the page in Chrome on Android with Bluetooth enabled.';
+        ui.featureNotice.classList.add('visible');
+        setConnectionState('error', 'Web Bluetooth unavailable');
+      }
+      updateButtonStates();
+    }
+
+    ui.connectButton.addEventListener('click', connect);
+    ui.syncButton.addEventListener('click', syncHistory);
+    ui.exportButton.addEventListener('click', exportCsv);
+
+    initChart();
+    renderHistory();
+    resetStatusDisplay();
+    detectBluetoothSupport();
+  </script>
+</body>
+</html>
