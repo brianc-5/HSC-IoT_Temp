@@ -216,7 +216,7 @@
 
     .buttons {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 10px;
       margin-top: 16px;
     }
@@ -491,6 +491,7 @@
           <h2>Actions</h2>
           <div class="buttons">
             <button id="connectButton" class="primary" type="button">Connect</button>
+            <button id="disconnectButton" type="button" disabled>Disconnect</button>
             <button id="syncButton" type="button" disabled>Sync history</button>
             <button id="exportButton" type="button" disabled>Export CSV</button>
           </div>
@@ -570,6 +571,7 @@
       featureNotice: document.querySelector('#featureNotice'),
       errorMessage: document.querySelector('#errorMessage'),
       connectButton: document.querySelector('#connectButton'),
+      disconnectButton: document.querySelector('#disconnectButton'),
       syncButton: document.querySelector('#syncButton'),
       exportButton: document.querySelector('#exportButton'),
       syncProgress: document.querySelector('#syncProgress'),
@@ -596,6 +598,7 @@
       ready: false,
       pickerOnNextAttempt: false,
       connecting: false,
+      disconnecting: false,
       historyNotificationsStarted: false,
       connectionGeneration: 0
     };
@@ -725,9 +728,11 @@
       const supported = 'bluetooth' in navigator && window.isSecureContext;
       const connected = isConnected();
       const syncing = Boolean(activeSync);
+      const transitioning = ble.connecting || ble.disconnecting;
 
-      ui.connectButton.disabled = !supported || ble.connecting || connected || syncing;
-      ui.syncButton.disabled = !connected || ble.connecting || syncing;
+      ui.connectButton.disabled = !supported || transitioning || connected || syncing;
+      ui.disconnectButton.disabled = !connected || transitioning;
+      ui.syncButton.disabled = !connected || transitioning || syncing;
       // Export is local-only and remains useful after the bridge disconnects.
       ui.exportButton.disabled = syncing || historyRecords.length === 0;
 
@@ -740,6 +745,7 @@
       } else {
         ui.connectButton.textContent = 'Connect';
       }
+      ui.disconnectButton.textContent = ble.disconnecting ? 'Disconnecting…' : 'Disconnect';
 
       if (syncing) {
         ui.syncButton.textContent = `Syncing… ${activeSync.received}`;
@@ -749,7 +755,7 @@
     }
 
     function formatAge(seconds) {
-      if (seconds === 0xffffffff) return 'Never';
+      if (seconds === 0xffffffff) return 'Unknown';
       if (seconds < 60) return `${seconds}s`;
       if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
       if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
@@ -989,12 +995,20 @@
 
     function handleDisconnected(event) {
       if (event.target !== ble.device) return;
+      const requested = ble.disconnecting;
+      ble.disconnecting = false;
       ble.connectionGeneration += 1;
       abortActiveSync(new Error('The bridge disconnected during history sync.'));
       clearGattState();
-      setConnectionState('error', `${ble.device.name || 'TempBridge'} disconnected`);
-      ui.liveCaption.textContent = 'Connection lost. Tap Reconnect to use the same bridge.';
-      showError('The Bluetooth connection was lost. Move closer to the bridge and tap Reconnect.');
+      if (requested) {
+        clearError();
+        setConnectionState('idle', 'Disconnected');
+        ui.liveCaption.textContent = 'Disconnected. Tap Reconnect to use the same bridge.';
+      } else {
+        setConnectionState('error', `${ble.device.name || 'TempBridge'} disconnected`);
+        ui.liveCaption.textContent = 'Connection lost. Tap Reconnect to use the same bridge.';
+        showError('The Bluetooth connection was lost. Move closer to the bridge and tap Reconnect.');
+      }
       updateButtonStates();
     }
 
@@ -1119,7 +1133,8 @@
     }
 
     async function connect() {
-      if (!('bluetooth' in navigator) || !window.isSecureContext || ble.connecting || isConnected()) return;
+      if (!('bluetooth' in navigator) || !window.isSecureContext ||
+          ble.connecting || ble.disconnecting || isConnected()) return;
 
       clearError();
       ble.connecting = true;
@@ -1172,6 +1187,25 @@
       }
     }
 
+    function disconnect() {
+      if (!isConnected() || ble.connecting || ble.disconnecting) return;
+
+      clearError();
+      ble.disconnecting = true;
+      if (activeSync) activeSync.cancelledByDisconnect = true;
+      setConnectionState('busy', 'Disconnecting…');
+      updateButtonStates();
+
+      try {
+        ble.device.gatt.disconnect();
+      } catch (error) {
+        ble.disconnecting = false;
+        setConnectionState('error', 'Disconnect failed');
+        showError(`Could not disconnect cleanly. ${describeError(error)}`);
+        updateButtonStates();
+      }
+    }
+
     function newestHeldEpoch() {
       let newest = 0;
       for (const record of historyRecords) newest = Math.max(newest, record.epochTs);
@@ -1193,7 +1227,8 @@
         watchdog: 0,
         settled: false,
         resolve: null,
-        reject: null
+        reject: null,
+        cancelledByDisconnect: false
       };
 
       const completion = new Promise((resolve, reject) => {
@@ -1236,8 +1271,12 @@
           showError(`History synced, but STATUS refresh failed. ${describeError(statusError)}`);
         }
       } catch (error) {
-        showError(`History sync failed. ${describeError(error)}`);
-        ui.syncProgress.textContent = `Sync interrupted after ${sync.received.toLocaleString()} records; partial data was not merged.`;
+        if (sync.cancelledByDisconnect) {
+          ui.syncProgress.textContent = `Sync cancelled after ${sync.received.toLocaleString()} records; partial data was not merged.`;
+        } else {
+          showError(`History sync failed. ${describeError(error)}`);
+          ui.syncProgress.textContent = `Sync interrupted after ${sync.received.toLocaleString()} records; partial data was not merged.`;
+        }
       } finally {
         window.clearTimeout(sync.watchdog);
         if (sync.committed) {
@@ -1308,6 +1347,7 @@
     }
 
     ui.connectButton.addEventListener('click', connect);
+    ui.disconnectButton.addEventListener('click', disconnect);
     ui.syncButton.addEventListener('click', syncHistory);
     ui.exportButton.addEventListener('click', exportCsv);
 
