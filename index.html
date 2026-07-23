@@ -505,9 +505,73 @@
       font-variant-numeric: tabular-nums;
     }
 
+    .chart-toolbar {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .window-toggle {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: thin;
+    }
+
+    .window-toggle button,
+    .chart-navigator button {
+      min-height: 36px;
+      padding: 7px 11px;
+      border-radius: 10px;
+      font-size: 0.76rem;
+      white-space: nowrap;
+    }
+
+    .window-toggle button[aria-pressed="true"] {
+      border-color: rgb(68 215 182 / 0.62);
+      background: rgb(68 215 182 / 0.14);
+      color: var(--accent-strong);
+    }
+
+    .chart-navigator {
+      display: grid;
+      grid-template-columns: auto minmax(90px, 1fr) auto;
+      gap: 9px;
+      align-items: center;
+    }
+
+    .chart-position {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: ew-resize;
+    }
+
+    .chart-view-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chart-view-meta span:last-child {
+      text-align: right;
+    }
+
     .chart-wrap {
       position: relative;
       height: 330px;
+    }
+
+    #historyChart {
+      touch-action: pan-y;
+      cursor: grab;
+    }
+
+    #historyChart.dragging {
+      cursor: grabbing;
     }
 
     .chart-fallback {
@@ -618,6 +682,20 @@
       .chart-wrap {
         height: 285px;
       }
+
+      .section-heading,
+      .chart-view-meta {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .chart-view-meta {
+        gap: 3px;
+      }
+
+      .chart-view-meta span:last-child {
+        text-align: left;
+      }
     }
   </style>
 </head>
@@ -703,6 +781,25 @@
       <div class="section-heading">
         <h2 id="chartTitle">Measurement history</h2>
         <span id="recordCount" class="record-count">0 records held</span>
+      </div>
+      <div class="chart-toolbar">
+        <div class="window-toggle" role="group" aria-label="Visible time window">
+          <button type="button" data-chart-window="1800000" aria-pressed="false">30 min</button>
+          <button type="button" data-chart-window="3600000" aria-pressed="true">1 h</button>
+          <button type="button" data-chart-window="7200000" aria-pressed="false">2 h</button>
+          <button type="button" data-chart-window="21600000" aria-pressed="false">6 h</button>
+          <button type="button" data-chart-window="43200000" aria-pressed="false">12 h</button>
+          <button type="button" data-chart-window="0" aria-pressed="false">All</button>
+        </div>
+        <div class="chart-navigator">
+          <button id="chartOlder" type="button" aria-label="Show older measurements">← Older</button>
+          <input id="chartPosition" class="chart-position" type="range" min="0" max="1000" value="1000" step="1" aria-label="Scroll through measurement history">
+          <button id="chartNewer" type="button" aria-label="Show newer measurements">Newer →</button>
+        </div>
+        <div class="chart-view-meta">
+          <span id="chartRange">No timestamped measurements</span>
+          <span>Drag the chart horizontally or use the scrubber</span>
+        </div>
       </div>
       <div class="chart-wrap">
         <canvas id="historyChart" aria-label="Measurement history chart"></canvas>
@@ -844,6 +941,10 @@
     const FLAG_AMBIENT_TEMP = 0x20;
     const ANALYTICS_SETTINGS_KEY = 'tempbridge.analytics.v3';
     const DARK_THRESHOLDS_LUX = Object.freeze([1, 3, 5]);
+    const DEFAULT_CHART_WINDOW_MS = 60 * 60 * 1000;
+    const CHART_POSITION_STEPS = 1000;
+    const CHART_PAN_FRACTION = 0.8;
+    const CHART_GAP_MINIMUM_MS = 5 * 60 * 1000;
 
     const CONFIGURATIONS = Object.freeze({
       0: Object.freeze({
@@ -921,6 +1022,11 @@
       historyBody: document.querySelector('#historyBody'),
       chartFallback: document.querySelector('#chartFallback'),
       chartCanvas: document.querySelector('#historyChart'),
+      chartWindowButtons: Array.from(document.querySelectorAll('[data-chart-window]')),
+      chartOlder: document.querySelector('#chartOlder'),
+      chartNewer: document.querySelector('#chartNewer'),
+      chartPosition: document.querySelector('#chartPosition'),
+      chartRange: document.querySelector('#chartRange'),
       rawStorageSection: document.querySelector('#rawStorageSection'),
       rawChartFallback: document.querySelector('#rawChartFallback'),
       rawChartCanvas: document.querySelector('#rawStorageChart'),
@@ -978,6 +1084,12 @@
     let currentConfigId = 0;
     let currentSampleIntervalMs = 0;
     let analyticsSettings = loadAnalyticsSettings();
+    let chartView = {
+      durationMs: DEFAULT_CHART_WINDOW_MS,
+      endMs: null,
+      followingLatest: true
+    };
+    let chartDrag = null;
 
     const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
       month: 'short',
@@ -1456,6 +1568,205 @@
       updateButtonStates();
     }
 
+    function timestampedHistoryBounds(records = historyRecords) {
+      const timestamps = records
+        .map((record) => record.epochTs * 1000)
+        .filter((timestamp) => Number.isFinite(timestamp) && timestamp > 0);
+      if (timestamps.length === 0) return null;
+      return {
+        earliestMs: Math.min(...timestamps),
+        latestMs: Math.max(...timestamps)
+      };
+    }
+
+    function resolveChartViewport(bounds, durationMs, requestedEndMs, followingLatest) {
+      if (!bounds) return null;
+      const { earliestMs, latestMs } = bounds;
+      if (durationMs <= 0) {
+        const paddingMs = earliestMs === latestMs ? 30 * 1000 : 0;
+        return {
+          startMs: earliestMs - paddingMs,
+          endMs: latestMs + paddingMs,
+          earliestMs,
+          latestMs,
+          minEndMs: latestMs,
+          position: CHART_POSITION_STEPS,
+          canPan: false
+        };
+      }
+
+      const minEndMs = Math.min(latestMs, earliestMs + durationMs);
+      const candidateEndMs = followingLatest || !Number.isFinite(requestedEndMs)
+        ? latestMs
+        : requestedEndMs;
+      const endMs = Math.min(latestMs, Math.max(minEndMs, candidateEndMs));
+      const position = latestMs === minEndMs
+        ? CHART_POSITION_STEPS
+        : Math.round(CHART_POSITION_STEPS * (endMs - minEndMs) / (latestMs - minEndMs));
+      return {
+        startMs: endMs - durationMs,
+        endMs,
+        earliestMs,
+        latestMs,
+        minEndMs,
+        position,
+        canPan: latestMs > minEndMs
+      };
+    }
+
+    function medianTimestampSpacingMs(records = historyRecords) {
+      const timestamps = records
+        .filter((record) => record.epochTs > 0)
+        .map((record) => record.epochTs * 1000)
+        .sort((a, b) => a - b);
+      const gaps = [];
+      for (let index = 1; index < timestamps.length; index += 1) {
+        const gap = timestamps[index] - timestamps[index - 1];
+        if (gap > 0) gaps.push(gap);
+      }
+      if (gaps.length === 0) return null;
+      gaps.sort((a, b) => a - b);
+      const middle = Math.floor(gaps.length / 2);
+      return gaps.length % 2 === 0
+        ? (gaps[middle - 1] + gaps[middle]) / 2
+        : gaps[middle];
+    }
+
+    function buildVisibleSeries(records, viewport, valueForRecord, gapThresholdMs) {
+      if (!viewport) return [];
+      const points = records
+        .map((record) => ({
+          x: record.epochTs * 1000,
+          y: valueForRecord(record)
+        }))
+        .filter((point) =>
+          point.x > 0 &&
+          point.x >= viewport.startMs &&
+          point.x <= viewport.endMs &&
+          point.y !== null &&
+          Number.isFinite(point.y)
+        )
+        .sort((a, b) => a.x - b.x);
+      if (points.length < 2) return points;
+
+      const withGaps = [points[0]];
+      for (let index = 1; index < points.length; index += 1) {
+        const previous = points[index - 1];
+        const point = points[index];
+        if (point.x - previous.x > gapThresholdMs) {
+          withGaps.push({ x: previous.x + (point.x - previous.x) / 2, y: null });
+        }
+        withGaps.push(point);
+      }
+      return withGaps;
+    }
+
+    function formatChartRange(viewport) {
+      if (!viewport) return 'No timestamped measurements';
+      const options = {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      return `${new Date(viewport.startMs).toLocaleString([], options)} – ${new Date(viewport.endMs).toLocaleString([], options)}`;
+    }
+
+    function formatChartTick(value) {
+      const date = new Date(Number(value));
+      const includeDate = chartView.durationMs === 0 || chartView.durationMs >= 12 * 60 * 60 * 1000;
+      return date.toLocaleString([], includeDate
+        ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+        : { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function updateChartNavigation(viewport) {
+      const allSelected = chartView.durationMs === 0;
+      for (const button of ui.chartWindowButtons) {
+        button.setAttribute('aria-pressed', String(Number(button.dataset.chartWindow) === chartView.durationMs));
+      }
+      ui.chartRange.textContent = formatChartRange(viewport);
+      ui.chartPosition.value = String(viewport ? viewport.position : CHART_POSITION_STEPS);
+      ui.chartPosition.disabled = !viewport || !viewport.canPan || allSelected;
+      ui.chartOlder.disabled = !viewport || allSelected || viewport.endMs <= viewport.minEndMs;
+      ui.chartNewer.disabled = !viewport || allSelected || viewport.endMs >= viewport.latestMs;
+    }
+
+    function setChartWindow(durationMs) {
+      chartView.durationMs = durationMs;
+      chartView.endMs = null;
+      chartView.followingLatest = true;
+      renderChart();
+    }
+
+    function setChartEnd(endMs) {
+      chartView.endMs = endMs;
+      chartView.followingLatest = false;
+      renderChart();
+    }
+
+    function panChart(fraction) {
+      if (chartView.durationMs <= 0) return;
+      const viewport = resolveChartViewport(
+        timestampedHistoryBounds(),
+        chartView.durationMs,
+        chartView.endMs,
+        chartView.followingLatest
+      );
+      if (!viewport) return;
+      setChartEnd(viewport.endMs + chartView.durationMs * fraction);
+    }
+
+    function handleChartPositionInput() {
+      const viewport = resolveChartViewport(
+        timestampedHistoryBounds(),
+        chartView.durationMs,
+        chartView.endMs,
+        chartView.followingLatest
+      );
+      if (!viewport || !viewport.canPan) return;
+      const ratio = Number(ui.chartPosition.value) / CHART_POSITION_STEPS;
+      setChartEnd(viewport.minEndMs + ratio * (viewport.latestMs - viewport.minEndMs));
+    }
+
+    function handleChartPointerDown(event) {
+      if (chartView.durationMs <= 0 || !historyChart?.chartArea) return;
+      const viewport = resolveChartViewport(
+        timestampedHistoryBounds(),
+        chartView.durationMs,
+        chartView.endMs,
+        chartView.followingLatest
+      );
+      if (!viewport?.canPan) return;
+      chartDrag = { pointerId: event.pointerId, startX: event.clientX, startEndMs: viewport.endMs };
+      ui.chartCanvas.classList.add('dragging');
+      ui.chartCanvas.setPointerCapture?.(event.pointerId);
+    }
+
+    function handleChartPointerMove(event) {
+      if (!chartDrag || event.pointerId !== chartDrag.pointerId || !historyChart?.chartArea) return;
+      const width = Math.max(1, historyChart.chartArea.right - historyChart.chartArea.left);
+      const deltaMs = -(event.clientX - chartDrag.startX) * chartView.durationMs / width;
+      setChartEnd(chartDrag.startEndMs + deltaMs);
+    }
+
+    function handleChartPointerUp(event) {
+      if (!chartDrag || event.pointerId !== chartDrag.pointerId) return;
+      ui.chartCanvas.releasePointerCapture?.(event.pointerId);
+      ui.chartCanvas.classList.remove('dragging');
+      chartDrag = null;
+    }
+
+    function handleChartWheel(event) {
+      if (chartView.durationMs <= 0 || !historyChart?.chartArea) return;
+      const horizontalIntent = Math.abs(event.deltaX) > Math.abs(event.deltaY) || event.shiftKey;
+      if (!horizontalIntent) return;
+      event.preventDefault();
+      const width = Math.max(1, historyChart.chartArea.right - historyChart.chartArea.left);
+      const delta = event.shiftKey ? event.deltaY : event.deltaX;
+      panChart(delta / width);
+    }
+
     function initChart() {
       if (typeof Chart === 'undefined') {
         ui.chartCanvas.hidden = true;
@@ -1478,6 +1789,7 @@
               pointHoverRadius: 5,
               borderWidth: 2,
               tension: 0.18,
+              spanGaps: false,
               yAxisID: 'temperature'
             },
             {
@@ -1490,6 +1802,7 @@
               pointHoverRadius: 5,
               borderWidth: 2,
               tension: 0.18,
+              spanGaps: false,
               hidden: true,
               yAxisID: 'voltage'
             },
@@ -1503,6 +1816,7 @@
               pointHoverRadius: 5,
               borderWidth: 2,
               tension: 0.18,
+              spanGaps: false,
               hidden: true,
               yAxisID: 'humidity'
             }
@@ -1544,9 +1858,7 @@
                 color: '#94a3b8',
                 maxRotation: 0,
                 callback(value) {
-                  return Number(value) === 0
-                    ? 'Unsynced'
-                    : new Date(Number(value)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  return formatChartTick(value);
                 }
               }
             },
@@ -1582,28 +1894,75 @@
     function renderChart() {
       if (!historyChart) {
         if (typeof Chart !== 'undefined') initChart();
-        if (!historyChart) return;
+        if (!historyChart) {
+          updateChartNavigation(null);
+          return;
+        }
       }
 
-      const temperatureData = historyRecords
-        .filter((record) => record.epochTs > 0 && record.tempC !== null)
-        .map((record) => ({ x: record.epochTs * 1000, y: record.tempC }));
-      const vddData = historyRecords
-        .filter((record) => record.epochTs > 0 && record.voltageV !== null && recordVoltageKind(record) === 'VDD')
-        .map((record) => ({ x: record.epochTs * 1000, y: record.voltageV }));
-      const humidityData = historyRecords
-        .filter((record) => record.epochTs > 0 && record.humidityPct !== null)
-        .map((record) => ({ x: record.epochTs * 1000, y: record.humidityPct }));
+      const bounds = timestampedHistoryBounds();
+      const viewport = resolveChartViewport(
+        bounds,
+        chartView.durationMs,
+        chartView.endMs,
+        chartView.followingLatest
+      );
+      if (viewport) {
+        chartView.endMs = viewport.endMs;
+        chartView.followingLatest = viewport.endMs >= viewport.latestMs;
+      }
+      const measuredSpacingMs = medianTimestampSpacingMs();
+      const nominalSpacingMs = currentSampleIntervalMs > 0 ? currentSampleIntervalMs : measuredSpacingMs;
+      const gapThresholdMs = Math.max(
+        CHART_GAP_MINIMUM_MS,
+        Number.isFinite(nominalSpacingMs) ? nominalSpacingMs * 3.5 : CHART_GAP_MINIMUM_MS
+      );
+      const temperatureData = buildVisibleSeries(
+        historyRecords,
+        viewport,
+        (record) => record.tempC,
+        gapThresholdMs
+      );
+      const vddData = buildVisibleSeries(
+        historyRecords,
+        viewport,
+        (record) => recordVoltageKind(record) === 'VDD' ? record.voltageV : null,
+        gapThresholdMs
+      );
+      const humidityData = buildVisibleSeries(
+        historyRecords,
+        viewport,
+        (record) => record.humidityPct,
+        gapThresholdMs
+      );
       const chartPointCount = temperatureData.length + vddData.length + humidityData.length;
+      const visibleRecordCount = viewport
+        ? historyRecords.filter((record) => {
+            const timestamp = record.epochTs * 1000;
+            return timestamp >= viewport.startMs && timestamp <= viewport.endMs;
+          }).length
+        : 0;
 
       ui.chartFallback.classList.toggle('visible', chartPointCount === 0);
       ui.chartFallback.textContent = historyRecords.length === 0
         ? 'Sync history to populate the chart.'
-        : 'The held records do not have valid synchronized timestamps.';
+        : bounds
+          ? 'No measurements fall inside this time window.'
+          : 'The held records do not have valid synchronized timestamps.';
 
       historyChart.data.datasets[0].data = temperatureData;
       historyChart.data.datasets[1].data = vddData;
       historyChart.data.datasets[2].data = humidityData;
+      const denseView = chartView.durationMs === 0 || visibleRecordCount > 600;
+      for (const dataset of historyChart.data.datasets) {
+        dataset.pointRadius = denseView ? 0 : 1.6;
+      }
+      historyChart.options.scales.x.min = viewport?.startMs;
+      historyChart.options.scales.x.max = viewport?.endMs;
+      updateChartNavigation(viewport);
+      if (viewport) {
+        ui.chartRange.textContent = `${formatChartRange(viewport)} · ${visibleRecordCount.toLocaleString()} ${visibleRecordCount === 1 ? 'sample' : 'samples'}`;
+      }
       historyChart.update('none');
     }
 
@@ -2587,6 +2946,59 @@
       return { epochTs, voltageV, lux, seq, vstorValid: true };
     }
 
+    function chartNavigationSelfTest() {
+      const threeHourBounds = { earliestMs: 1_000_000, latestMs: 1_000_000 + 3 * 60 * 60 * 1000 };
+      const latestHour = resolveChartViewport(threeHourBounds, 60 * 60 * 1000, null, true);
+      const oldestHour = resolveChartViewport(threeHourBounds, 60 * 60 * 1000, 0, false);
+      const allHistory = resolveChartViewport(threeHourBounds, 0, null, true);
+      const denseRecords = Array.from({ length: BRIDGE_RECORD_CAPACITY }, (_, index) => ({
+        epochTs: 10_000 + index * 20,
+        tempC: 20 + Math.sin(index / 40)
+      }));
+      const denseBounds = timestampedHistoryBounds(denseRecords);
+      const denseViewport = resolveChartViewport(denseBounds, 60 * 60 * 1000, null, true);
+      const denseSeries = buildVisibleSeries(denseRecords, denseViewport, (record) => record.tempC, 5 * 60 * 1000);
+      const gapRecords = [
+        { epochTs: 1000, tempC: 21 },
+        { epochTs: 1020, tempC: 21.1 },
+        { epochTs: 1040, tempC: 21.2 },
+        { epochTs: 1600, tempC: 24 }
+      ];
+      const gapViewport = {
+        startMs: 900 * 1000,
+        endMs: 1700 * 1000
+      };
+      const gappedSeries = buildVisibleSeries(
+        gapRecords,
+        gapViewport,
+        (record) => record.tempC,
+        CHART_GAP_MINIMUM_MS
+      );
+
+      return runNamedTests([
+        ['latest window', () => {
+          testAssert(latestHour.endMs === threeHourBounds.latestMs, 'latest window did not follow newest data');
+          testAssert(latestHour.endMs - latestHour.startMs === 60 * 60 * 1000, 'window width changed');
+        }],
+        ['older clamp', () => {
+          testAssert(oldestHour.startMs === threeHourBounds.earliestMs, 'older navigation crossed the first sample');
+          testAssert(oldestHour.position === 0, `expected position 0, got ${oldestHour.position}`);
+        }],
+        ['all history', () => {
+          testAssert(allHistory.startMs === threeHourBounds.earliestMs, 'all-history start is wrong');
+          testAssert(allHistory.endMs === threeHourBounds.latestMs, 'all-history end is wrong');
+          testAssert(!allHistory.canPan, 'all-history view should not pan');
+        }],
+        ['4096-record retention', () => {
+          testAssert(denseSeries.length === 181, `expected 181 samples in a one-hour inclusive window, got ${denseSeries.length}`);
+          return `${denseSeries.length} visible of ${denseRecords.length}`;
+        }],
+        ['sampling gap break', () => {
+          testAssert(gappedSeries.some((point) => point.y === null), 'long gap was connected');
+        }]
+      ]);
+    }
+
     function powerMathSelfTest() {
       const endTs = 10000;
       const rampSlope = 36e-6;
@@ -2965,16 +3377,29 @@
     ui.exportButton.addEventListener('click', exportCsv);
     ui.capacitanceInput.addEventListener('change', updateAnalyticsSettings);
     ui.regressionWindowInput.addEventListener('change', updateAnalyticsSettings);
+    for (const button of ui.chartWindowButtons) {
+      button.addEventListener('click', () => setChartWindow(Number(button.dataset.chartWindow)));
+    }
+    ui.chartOlder.addEventListener('click', () => panChart(-CHART_PAN_FRACTION));
+    ui.chartNewer.addEventListener('click', () => panChart(CHART_PAN_FRACTION));
+    ui.chartPosition.addEventListener('input', handleChartPositionInput);
+    ui.chartCanvas.addEventListener('pointerdown', handleChartPointerDown);
+    ui.chartCanvas.addEventListener('pointermove', handleChartPointerMove);
+    ui.chartCanvas.addEventListener('pointerup', handleChartPointerUp);
+    ui.chartCanvas.addEventListener('pointercancel', handleChartPointerUp);
+    ui.chartCanvas.addEventListener('wheel', handleChartWheel, { passive: false });
 
     ui.capacitanceInput.value = String(analyticsSettings.capacitanceF);
     ui.regressionWindowInput.value = String(analyticsSettings.regressionWindowMinutes);
 
     // Console-callable pure checks for protocol math development and release QA.
     window.protocolSelfTest = protocolSelfTest;
+    window.chartNavigationSelfTest = chartNavigationSelfTest;
     window.powerMathSelfTest = powerMathSelfTest;
     window.inferenceMathSelfTest = inferenceMathSelfTest;
     window.tempBridgeSelfTest = () => Object.freeze({
       protocol: protocolSelfTest(),
+      chart: chartNavigationSelfTest(),
       power: powerMathSelfTest(),
       inference: inferenceMathSelfTest()
     });
