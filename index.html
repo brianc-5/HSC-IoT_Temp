@@ -94,6 +94,47 @@
       white-space: nowrap;
     }
 
+    .config-banner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      border: 1px solid rgb(68 215 182 / 0.28);
+      border-radius: 14px;
+      background: rgb(68 215 182 / 0.07);
+    }
+
+    .config-banner strong,
+    .config-banner span {
+      display: block;
+    }
+
+    .config-banner strong {
+      margin-bottom: 4px;
+      color: var(--accent-strong);
+      font-size: 1rem;
+    }
+
+    .config-banner span {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .cadence-badge {
+      min-width: 116px;
+      padding: 9px 12px;
+      border: 1px solid rgb(68 215 182 / 0.22);
+      border-radius: 999px;
+      background: rgb(8 12 20 / 0.32);
+      color: var(--text) !important;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
     .state-dot {
       width: 10px;
       height: 10px;
@@ -172,7 +213,7 @@
 
     .live-details {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
       gap: 10px;
     }
 
@@ -268,7 +309,7 @@
 
     .status-grid {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
       gap: 8px;
       margin-top: 16px;
     }
@@ -333,6 +374,121 @@
     .history-card {
       margin-top: 18px;
       padding: 22px;
+    }
+
+    .analysis-note {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border: 1px solid rgb(101 169 255 / 0.3);
+      border-radius: 11px;
+      background: rgb(101 169 255 / 0.07);
+      color: #cfe2ff;
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    .settings-grid,
+    .summary-grid,
+    .candidate-grid {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .settings-grid {
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+    }
+
+    .candidate-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .setting,
+    .summary-item,
+    .candidate {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid rgb(38 52 75 / 0.75);
+      border-radius: 12px;
+      background: rgb(8 12 20 / 0.35);
+    }
+
+    .setting label,
+    .summary-item span,
+    .candidate span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.69rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .setting input {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      outline: 0;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .setting input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgb(68 215 182 / 0.1);
+    }
+
+    .setting small,
+    .candidate small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      line-height: 1.4;
+    }
+
+    .summary-item strong,
+    .candidate strong {
+      display: block;
+      overflow: hidden;
+      font-size: 1rem;
+      font-variant-numeric: tabular-nums;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .summary-item.primary-estimate {
+      border-color: rgb(255 204 102 / 0.42);
+      background: rgb(255 204 102 / 0.08);
+    }
+
+    .summary-item.primary-estimate strong {
+      color: var(--warning);
+    }
+
+    .subsection-heading {
+      margin: 22px 0 12px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 650;
+      letter-spacing: 0.075em;
+      text-transform: uppercase;
+    }
+
+    .compact-chart {
+      height: 285px;
+    }
+
+    .estimated-label {
+      color: var(--warning);
     }
 
     .section-heading {
@@ -419,6 +575,10 @@
       text-align: center;
     }
 
+    [hidden] {
+      display: none !important;
+    }
+
     @media (max-width: 760px) {
       header {
         align-items: flex-start;
@@ -442,8 +602,17 @@
         grid-template-columns: repeat(2, 1fr);
       }
 
-      .status-item:last-child {
-        grid-column: span 2;
+      .config-banner {
+        grid-template-columns: 1fr;
+      }
+
+      .cadence-badge {
+        justify-self: start;
+      }
+
+      .settings-grid,
+      .candidate-grid {
+        grid-template-columns: 1fr;
       }
 
       .chart-wrap {
@@ -465,15 +634,31 @@
     <div id="featureNotice" class="notice" role="alert"></div>
     <div id="errorMessage" class="error-message" role="alert" aria-live="assertive"></div>
 
+    <section class="config-banner" aria-label="Detected sensor configuration" aria-live="polite">
+      <div>
+        <strong id="configurationName">Configuration unknown</strong>
+        <span id="configurationDetail">Connect to a Protocol v3 bridge to detect the sensor hardware and power source automatically.</span>
+      </div>
+      <span id="configurationCadence" class="cadence-badge">Interval unknown</span>
+    </section>
+
     <section class="grid" aria-label="Current reading and bridge controls">
       <article class="card live-card">
-        <h2>Current temperature</h2>
+        <h2 id="temperatureHeading">Current temperature</h2>
         <div class="temperature"><span id="temperatureValue">--.--</span><span class="unit">°C</span></div>
         <p id="liveCaption" class="live-caption">Connect to see the latest sample.</p>
         <div class="live-details">
-          <div class="metric">
-            <span class="metric-label">Supply</span>
+          <div id="voltageMetric" class="metric">
+            <span id="voltageLabel" class="metric-label">Voltage</span>
             <span id="voltageValue" class="metric-value">—</span>
+          </div>
+          <div id="humidityMetric" class="metric hat-field" hidden>
+            <span class="metric-label">Humidity</span>
+            <span id="humidityValue" class="metric-value">—</span>
+          </div>
+          <div id="luxMetric" class="metric hat-field" hidden>
+            <span class="metric-label">Illuminance</span>
+            <span id="luxValue" class="metric-value">—</span>
           </div>
           <div class="metric">
             <span class="metric-label">Sequence</span>
@@ -506,6 +691,9 @@
             <div class="status-item"><strong id="statusRssi">—</strong><span>Last RSSI</span></div>
             <div class="status-item"><strong id="statusClock">—</strong><span>Clock</span></div>
             <div class="status-item"><strong id="statusFirmware">—</strong><span>Firmware</span></div>
+            <div class="status-item"><strong id="statusConfiguration">—</strong><span>Configuration</span></div>
+            <div class="status-item"><strong id="statusInterval">—</strong><span>Sample interval</span></div>
+            <div class="status-item"><strong id="statusRetention">—</strong><span>4096-record span</span></div>
           </div>
         </article>
       </div>
@@ -513,12 +701,90 @@
 
     <section class="card history-card" aria-labelledby="chartTitle">
       <div class="section-heading">
-        <h2 id="chartTitle">History</h2>
+        <h2 id="chartTitle">Measurement history</h2>
         <span id="recordCount" class="record-count">0 records held</span>
       </div>
       <div class="chart-wrap">
-        <canvas id="historyChart" aria-label="Temperature and voltage history chart"></canvas>
+        <canvas id="historyChart" aria-label="Measurement history chart"></canvas>
         <p id="chartFallback" class="chart-fallback">Sync history to populate the chart.</p>
+      </div>
+    </section>
+
+    <section id="rawStorageSection" class="card history-card" aria-labelledby="rawStorageTitle" hidden>
+      <div class="section-heading">
+        <h2 id="rawStorageTitle">Raw VSTOR and illuminance history</h2>
+        <span class="record-count">VSTOR-valid samples only</span>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="rawStorageChart" aria-label="Raw VSTOR and illuminance history chart"></canvas>
+        <p id="rawChartFallback" class="chart-fallback">No timestamped HAT samples are available.</p>
+      </div>
+    </section>
+
+    <section id="powerSection" class="card history-card" aria-labelledby="powerTitle" hidden>
+      <div class="section-heading">
+        <h2 id="powerTitle" class="estimated-label">Estimated panel harvest into VSTOR</h2>
+        <span class="record-count">Experimental constant-drain inference</span>
+      </div>
+      <p id="powerAvailability" class="analysis-note">Storage-power analysis is not available for this configuration.</p>
+
+      <div class="settings-grid" aria-label="Power calculation settings">
+        <div class="setting">
+          <label for="capacitanceInput">Storage capacitance (F)</label>
+          <input id="capacitanceInput" type="number" min="0.000001" step="0.1" inputmode="decimal" value="1">
+          <small>Energy-balance capacitance; default 1.0 F.</small>
+        </div>
+        <div class="setting">
+          <label for="regressionWindowInput">Trailing window (minutes)</label>
+          <input id="regressionWindowInput" type="number" min="1" step="1" inputmode="decimal" value="45">
+          <small>At least six samples are required per regression.</small>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item primary-estimate"><span>Latest estimated harvest</span><strong id="latestEstimatedHarvest">—</strong></div>
+        <div class="summary-item"><span>Latest net power</span><strong id="latestNetPower">—</strong></div>
+        <div class="summary-item"><span>Valid estimates</span><strong id="validPowerCount">0</strong></div>
+        <div class="summary-item"><span>Median spacing</span><strong id="medianSpacing">—</strong></div>
+      </div>
+
+      <h3 class="subsection-heading">Measured intermediary · Net storage power</h3>
+      <div class="chart-wrap compact-chart">
+        <canvas id="powerChart" aria-label="Net storage power history chart"></canvas>
+        <p id="powerChartFallback" class="chart-fallback">Not enough valid VSTOR history for a regression.</p>
+      </div>
+
+      <h3 class="subsection-heading">Automatic low-light drain baseline</h3>
+      <p id="inferenceSummary" class="analysis-note">Collect dark data to estimate the constant storage-plane drain automatically.</p>
+      <div id="candidateGrid" class="candidate-grid" aria-label="Low-light baseline candidates"></div>
+
+      <div class="summary-grid">
+        <div class="summary-item"><span>Estimated dark drain / usage</span><strong id="estimatedDrain">—</strong></div>
+        <div class="summary-item"><span>Accepted band</span><strong id="acceptedBand">—</strong></div>
+        <div class="summary-item"><span>Confidence / coverage</span><strong id="inferenceConfidence">—</strong></div>
+        <div class="summary-item"><span>Harvest–lux slope</span><strong id="harvestLuxSlope">—</strong></div>
+      </div>
+
+      <div class="chart-wrap compact-chart">
+        <canvas id="harvestChart" aria-label="Estimated panel harvest into VSTOR chart"></canvas>
+        <p id="harvestChartFallback" class="chart-fallback">A stable low-light baseline is required before harvest can be estimated.</p>
+      </div>
+
+      <h3 class="subsection-heading">Estimated daily energy from available coverage</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Local date</th>
+              <th scope="col">Estimated harvest</th>
+              <th scope="col">Coverage</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="dailyEnergyBody">
+            <tr class="empty-row"><td colspan="4">No accepted harvest estimate.</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
@@ -533,13 +799,16 @@
             <tr>
               <th scope="col">Time</th>
               <th scope="col">Seq</th>
+              <th scope="col">Configuration</th>
               <th scope="col">Temperature</th>
               <th scope="col">Voltage</th>
+              <th class="hat-column" scope="col" hidden>Lux</th>
+              <th class="hat-column" scope="col" hidden>Humidity</th>
               <th scope="col">RSSI</th>
             </tr>
           </thead>
           <tbody id="historyBody">
-            <tr class="empty-row"><td colspan="5">No history loaded.</td></tr>
+            <tr class="empty-row"><td colspan="8">No history loaded.</td></tr>
           </tbody>
         </table>
       </div>
@@ -560,10 +829,59 @@
       status:   '8f0e0006-9d7d-4d5a-9f2b-3c4a5b6c7d8e'
     });
 
-    const RECORD_BYTES = 12;
+    const PROTOCOL_VERSION = 3;
+    const RECORD_BYTES = 16;
+    const STATUS_BYTES = 16;
     const HISTORY_END_MARKER = 0xff;
     const HISTORY_REQUEST = 0x01;
     const HISTORY_STALL_TIMEOUT_MS = 15000;
+    const BRIDGE_RECORD_CAPACITY = 4096;
+    const INVALID_TEMP_CENTI = -32768;
+    const INVALID_UINT16 = 0xffff;
+    const FLAG_CLOCK_SYNCED = 0x01;
+    const FLAG_CONFIG_MASK = 0x0e;
+    const FLAG_VSTOR_VALID = 0x10;
+    const FLAG_AMBIENT_TEMP = 0x20;
+    const ANALYTICS_SETTINGS_KEY = 'tempbridge.analytics.v3';
+    const DARK_THRESHOLDS_LUX = Object.freeze([1, 3, 5]);
+
+    const CONFIGURATIONS = Object.freeze({
+      0: Object.freeze({
+        short: 'Legacy',
+        name: 'Legacy/unknown',
+        detail: 'Older or unidentified sensor advertisement. LIVE, history, tables, and CSV remain available.',
+        hat: false,
+        bare: false
+      }),
+      1: Object.freeze({
+        short: 'Bare + USB',
+        name: 'Bare + USB',
+        detail: 'Bare XIAO powered by USB. MCU die temperature and regulated VDD are available.',
+        hat: false,
+        bare: true
+      }),
+      2: Object.freeze({
+        short: 'Bare + external',
+        name: 'Bare + external power (CJMCU expected)',
+        detail: 'Bare XIAO on external power. VSTOR is not observable without the Logger HAT.',
+        hat: false,
+        bare: true
+      }),
+      3: Object.freeze({
+        short: 'HAT + USB',
+        name: 'HAT + USB',
+        detail: 'Ambient conditions are available. USB deliberately invalidates VSTOR and storage-power analysis.',
+        hat: true,
+        bare: false
+      }),
+      4: Object.freeze({
+        short: 'HAT + external',
+        name: 'HAT + external power/CJMCU',
+        detail: 'Ambient conditions and valid VSTOR samples support storage-plane power analysis.',
+        hat: true,
+        bare: false
+      })
+    });
 
     const ui = {
       stateDot: document.querySelector('#stateDot'),
@@ -575,8 +893,18 @@
       syncButton: document.querySelector('#syncButton'),
       exportButton: document.querySelector('#exportButton'),
       syncProgress: document.querySelector('#syncProgress'),
+      configurationName: document.querySelector('#configurationName'),
+      configurationDetail: document.querySelector('#configurationDetail'),
+      configurationCadence: document.querySelector('#configurationCadence'),
+      temperatureHeading: document.querySelector('#temperatureHeading'),
       temperatureValue: document.querySelector('#temperatureValue'),
+      voltageMetric: document.querySelector('#voltageMetric'),
+      voltageLabel: document.querySelector('#voltageLabel'),
       voltageValue: document.querySelector('#voltageValue'),
+      humidityMetric: document.querySelector('#humidityMetric'),
+      humidityValue: document.querySelector('#humidityValue'),
+      luxMetric: document.querySelector('#luxMetric'),
+      luxValue: document.querySelector('#luxValue'),
       sequenceValue: document.querySelector('#sequenceValue'),
       rssiValue: document.querySelector('#rssiValue'),
       liveCaption: document.querySelector('#liveCaption'),
@@ -585,10 +913,38 @@
       statusRssi: document.querySelector('#statusRssi'),
       statusClock: document.querySelector('#statusClock'),
       statusFirmware: document.querySelector('#statusFirmware'),
+      statusConfiguration: document.querySelector('#statusConfiguration'),
+      statusInterval: document.querySelector('#statusInterval'),
+      statusRetention: document.querySelector('#statusRetention'),
+      chartTitle: document.querySelector('#chartTitle'),
       recordCount: document.querySelector('#recordCount'),
       historyBody: document.querySelector('#historyBody'),
       chartFallback: document.querySelector('#chartFallback'),
-      chartCanvas: document.querySelector('#historyChart')
+      chartCanvas: document.querySelector('#historyChart'),
+      rawStorageSection: document.querySelector('#rawStorageSection'),
+      rawChartFallback: document.querySelector('#rawChartFallback'),
+      rawChartCanvas: document.querySelector('#rawStorageChart'),
+      powerSection: document.querySelector('#powerSection'),
+      powerAvailability: document.querySelector('#powerAvailability'),
+      capacitanceInput: document.querySelector('#capacitanceInput'),
+      regressionWindowInput: document.querySelector('#regressionWindowInput'),
+      latestEstimatedHarvest: document.querySelector('#latestEstimatedHarvest'),
+      latestNetPower: document.querySelector('#latestNetPower'),
+      validPowerCount: document.querySelector('#validPowerCount'),
+      medianSpacing: document.querySelector('#medianSpacing'),
+      powerChartFallback: document.querySelector('#powerChartFallback'),
+      powerChartCanvas: document.querySelector('#powerChart'),
+      inferenceSummary: document.querySelector('#inferenceSummary'),
+      candidateGrid: document.querySelector('#candidateGrid'),
+      estimatedDrain: document.querySelector('#estimatedDrain'),
+      acceptedBand: document.querySelector('#acceptedBand'),
+      inferenceConfidence: document.querySelector('#inferenceConfidence'),
+      harvestLuxSlope: document.querySelector('#harvestLuxSlope'),
+      harvestChartFallback: document.querySelector('#harvestChartFallback'),
+      harvestChartCanvas: document.querySelector('#harvestChart'),
+      dailyEnergyBody: document.querySelector('#dailyEnergyBody'),
+      hatFields: Array.from(document.querySelectorAll('.hat-field')),
+      hatColumns: Array.from(document.querySelectorAll('.hat-column'))
     };
 
     const ble = {
@@ -600,18 +956,28 @@
       connecting: false,
       disconnecting: false,
       historyNotificationsStarted: false,
+      protocolValidated: false,
+      protocolFailureMessage: null,
       connectionGeneration: 0
     };
 
-    // The Map supplies seq-keyed idempotence; historyRecords is the sorted array
-    // used by the chart, table, incremental request boundary, and CSV export.
-    const recordsBySeq = new Map();
+    // Synchronized records use epoch+uint16-sequence identity so sequence wrap
+    // cannot overwrite older page-held data. Unsynced records use every
+    // available immutable wire field; exact duplicates remain idempotent.
+    const recordsByIdentity = new Map();
     let historyRecords = [];
     let historyInitialized = false;
     let latestLiveRecord = null;
     let activeSync = null;
     let historyChart = null;
+    let rawStorageChart = null;
+    let powerChart = null;
+    let harvestChart = null;
     let lastBridgeRecordCount = null;
+    let latestStatus = null;
+    let currentConfigId = 0;
+    let currentSampleIntervalMs = 0;
+    let analyticsSettings = loadAnalyticsSettings();
 
     const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
       month: 'short',
@@ -640,34 +1006,64 @@
       const epochTs = view.getUint32(offset + 0, true);
       const seq = view.getUint16(offset + 4, true);
       const tempCenti = view.getInt16(offset + 6, true);
-      const vbatMv = view.getUint16(offset + 8, true);
-      const rssi = view.getInt8(offset + 10);
-      const flags = view.getUint8(offset + 11);
+      const voltageMvRaw = view.getUint16(offset + 8, true);
+      const luxRaw = view.getUint16(offset + 10, true);
+      const humidityCentiRaw = view.getUint16(offset + 12, true);
+      const rssi = view.getInt8(offset + 14);
+      const flags = view.getUint8(offset + 15);
+      const tempC = tempCenti === INVALID_TEMP_CENTI ? null : tempCenti / 100;
+      const voltageMv = voltageMvRaw === INVALID_UINT16 ? null : voltageMvRaw;
+      const lux = luxRaw === INVALID_UINT16 ? null : luxRaw;
+      const humidityCenti = humidityCentiRaw === INVALID_UINT16 ? null : humidityCentiRaw;
+      const configId = (flags & FLAG_CONFIG_MASK) >>> 1;
+      const vstorValid = (flags & FLAG_VSTOR_VALID) !== 0 && voltageMv !== null;
+      const ambientTemperature = (flags & FLAG_AMBIENT_TEMP) !== 0;
 
       return Object.freeze({
         epochTs,
         seq,
         tempCenti,
-        tempC: tempCenti / 100,
-        vbatMv,
+        tempC,
+        voltageMv,
+        voltageV: voltageMv === null ? null : voltageMv / 1000,
+        lux,
+        humidityCenti,
+        humidityPct: humidityCenti === null ? null : humidityCenti / 100,
         rssi,
-        flags
+        flags,
+        clockSynced: (flags & FLAG_CLOCK_SYNCED) !== 0,
+        configId,
+        vstorValid,
+        ambientTemperature
       });
     }
 
     function parseStatus(value) {
       const view = asDataView(value);
-      if (view.byteLength !== 11) {
-        throw new RangeError(`Invalid STATUS length: expected 11 bytes, received ${view.byteLength}.`);
+      if (view.byteLength !== STATUS_BYTES) {
+        throw new RangeError(
+          `Protocol mismatch: this app requires the ${STATUS_BYTES}-byte Protocol v${PROTOCOL_VERSION} STATUS, ` +
+          `but the bridge returned ${view.byteLength} bytes. Upgrade the bridge and webapp together.`
+        );
       }
 
-      return Object.freeze({
+      const status = Object.freeze({
         recordCount: view.getUint32(0, true),
         lastSampleAgeS: view.getUint32(4, true),
         lastRssi: view.getInt8(8),
         flags: view.getUint8(9),
-        fwVersion: view.getUint8(10)
+        fwVersion: view.getUint8(10),
+        configId: view.getUint8(11),
+        sampleIntervalMs: view.getUint32(12, true)
       });
+
+      if (status.fwVersion !== PROTOCOL_VERSION) {
+        throw new RangeError(
+          `Protocol mismatch: this app requires bridge firmware v${PROTOCOL_VERSION}, ` +
+          `but the bridge reports v${status.fwVersion}. No time sync or record parsing was attempted.`
+        );
+      }
+      return status;
     }
 
     function uint32LE(value) {
@@ -682,6 +1078,102 @@
       view.setUint8(0, HISTORY_REQUEST);
       view.setUint32(1, sinceEpoch, true);
       return buffer;
+    }
+
+    function protocolSelfTest() {
+      return runNamedTests([
+        ['16-byte record and flags', () => {
+          const buffer = new ArrayBuffer(RECORD_BYTES);
+          const view = new DataView(buffer);
+          view.setUint32(0, 123456, true);
+          view.setUint16(4, 77, true);
+          view.setInt16(6, 2345, true);
+          view.setUint16(8, 3800, true);
+          view.setUint16(10, 2, true);
+          view.setUint16(12, 4567, true);
+          view.setInt8(14, -61);
+          view.setUint8(15, FLAG_CLOCK_SYNCED | (4 << 1) | FLAG_VSTOR_VALID | FLAG_AMBIENT_TEMP);
+          const record = parseRecord(buffer);
+          testAssert(record.epochTs === 123456 && record.seq === 77, 'record prefix was decoded incorrectly');
+          testAssert(record.tempC === 23.45 && record.humidityPct === 45.67, 'environment fields were decoded incorrectly');
+          testAssert(record.voltageV === 3.8 && record.vstorValid, 'VSTOR field/flag was decoded incorrectly');
+          testAssert(record.configId === 4 && record.ambientTemperature, 'configuration/temperature flags were decoded incorrectly');
+        }],
+        ['record sentinels become null', () => {
+          const buffer = new ArrayBuffer(RECORD_BYTES);
+          const view = new DataView(buffer);
+          view.setInt16(6, INVALID_TEMP_CENTI, true);
+          view.setUint16(8, INVALID_UINT16, true);
+          view.setUint16(10, INVALID_UINT16, true);
+          view.setUint16(12, INVALID_UINT16, true);
+          view.setUint8(15, (3 << 1) | FLAG_VSTOR_VALID | FLAG_AMBIENT_TEMP);
+          const record = parseRecord(buffer);
+          testAssert(record.tempC === null && record.voltageV === null &&
+            record.lux === null && record.humidityPct === null, 'one or more sentinels leaked through');
+          testAssert(record.vstorValid === false, 'invalid voltage retained the VSTOR-valid capability');
+        }],
+        ['exact v3 STATUS', () => {
+          const buffer = new ArrayBuffer(STATUS_BYTES);
+          const view = new DataView(buffer);
+          view.setUint32(0, 4096, true);
+          view.setUint32(4, 8, true);
+          view.setInt8(8, -55);
+          view.setUint8(9, 1);
+          view.setUint8(10, PROTOCOL_VERSION);
+          view.setUint8(11, 4);
+          view.setUint32(12, 180000, true);
+          const status = parseStatus(buffer);
+          testAssert(status.recordCount === 4096 && status.configId === 4 &&
+            status.sampleIntervalMs === 180000, 'STATUS fields were decoded incorrectly');
+        }],
+        ['STATUS length/version rejection', () => {
+          let lengthRejected = false;
+          let versionRejected = false;
+          try {
+            parseStatus(new ArrayBuffer(STATUS_BYTES - 1));
+          } catch (_error) {
+            lengthRejected = true;
+          }
+          const wrongVersion = new ArrayBuffer(STATUS_BYTES);
+          new DataView(wrongVersion).setUint8(10, PROTOCOL_VERSION - 1);
+          try {
+            parseStatus(wrongVersion);
+          } catch (_error) {
+            versionRejected = true;
+          }
+          testAssert(lengthRejected && versionRejected, 'STATUS gate accepted an incompatible bridge');
+        }],
+        ['sequence-wrap identity and epoch patching', () => {
+          const base = {
+            epochTs: 100,
+            seq: 7,
+            tempCenti: 2100,
+            voltageMv: 3300,
+            lux: null,
+            humidityCenti: null,
+            rssi: -50,
+            flags: 0
+          };
+          const wrappedStore = new Map();
+          mergeRecordIntoStore(wrappedStore, base);
+          mergeRecordIntoStore(wrappedStore, { ...base, epochTs: 65636 });
+          mergeRecordIntoStore(wrappedStore, base);
+          testAssert(wrappedStore.size === 2,
+            `uint16 sequence wrap collapsed distinct epochs to ${wrappedStore.size} record(s)`);
+
+          const patchedStore = new Map();
+          mergeRecordIntoStore(patchedStore, { ...base, epochTs: 0 });
+          mergeRecordIntoStore(patchedStore, { ...base, epochTs: 200 });
+          testAssert(patchedStore.size === 1 && patchedStore.has('e:200:7'),
+            'epoch-patched record did not replace its exact unsynced representation');
+
+          const unsyncedStore = new Map();
+          mergeRecordIntoStore(unsyncedStore, { ...base, epochTs: 0 });
+          mergeRecordIntoStore(unsyncedStore, { ...base, epochTs: 0, voltageMv: 3299 });
+          testAssert(unsyncedStore.size === 2,
+            'distinguishable unsynced records with the same sequence were collapsed');
+        }]
+      ]);
     }
 
     async function writeCharacteristic(characteristic, value) {
@@ -762,50 +1254,156 @@
       return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
     }
 
+    function formatDurationSeconds(seconds) {
+      if (!Number.isFinite(seconds) || seconds < 0) return 'Unknown';
+      if (seconds < 1) return `${Math.round(seconds * 1000)} ms`;
+      if (seconds < 60) return `${Number(seconds.toFixed(seconds < 10 ? 2 : 1))} s`;
+      if (seconds < 3600) return `${Number((seconds / 60).toFixed(1))} min`;
+      if (seconds < 86400) return `${Number((seconds / 3600).toFixed(1))} h`;
+      return `${Number((seconds / 86400).toFixed(1))} d`;
+    }
+
+    function formatSampleInterval(milliseconds) {
+      return milliseconds > 0 ? formatDurationSeconds(milliseconds / 1000) : 'Unknown';
+    }
+
+    function configurationFor(id) {
+      return CONFIGURATIONS[id] || Object.freeze({
+        short: `Unknown ${id}`,
+        name: `Unknown configuration (${id})`,
+        detail: 'The sensor reported an unrecognized configuration. Raw records remain available, but capability assumptions are disabled.',
+        hat: false,
+        bare: false
+      });
+    }
+
+    function recordTemperatureSource(record) {
+      return record.ambientTemperature ? 'Ambient' : 'MCU die';
+    }
+
+    function recordVoltageKind(record) {
+      return record.vstorValid ? 'VSTOR' : 'VDD';
+    }
+
+    function formatNullable(value, suffix = '', digits = null) {
+      if (value === null || !Number.isFinite(value)) return '—';
+      const rendered = digits === null ? String(value) : value.toFixed(digits);
+      return `${rendered}${suffix}`;
+    }
+
+    function updateConfigurationDisplay(configId, sampleIntervalMs = currentSampleIntervalMs) {
+      const previousConfigId = currentConfigId;
+      currentConfigId = Number.isInteger(configId) ? configId : 0;
+      currentSampleIntervalMs = Number.isFinite(sampleIntervalMs) && sampleIntervalMs > 0
+        ? sampleIntervalMs
+        : 0;
+      const config = configurationFor(currentConfigId);
+      const interval = formatSampleInterval(currentSampleIntervalMs);
+      ui.configurationName.textContent = config.name;
+      ui.configurationDetail.textContent = config.detail;
+      ui.configurationCadence.textContent = currentSampleIntervalMs > 0
+        ? `Every ${interval}`
+        : 'Interval unknown';
+      ui.statusConfiguration.textContent = config.short;
+      ui.statusInterval.textContent = interval;
+      ui.statusRetention.textContent = currentSampleIntervalMs > 0
+        ? formatDurationSeconds((BRIDGE_RECORD_CAPACITY * currentSampleIntervalMs) / 1000)
+        : 'Unknown';
+      renderCapabilities();
+      if (previousConfigId !== currentConfigId) renderAnalytics();
+    }
+
     function formatRecordTime(epochTs) {
       return epochTs === 0 ? 'Unsynced' : dateTimeFormatter.format(new Date(epochTs * 1000));
     }
 
     function renderStatus(status) {
+      latestStatus = status;
       ui.statusRecords.textContent = status.recordCount.toLocaleString();
       ui.statusAge.textContent = formatAge(status.lastSampleAgeS);
       ui.statusRssi.textContent = status.recordCount === 0 ? '—' : `${status.lastRssi} dBm`;
       ui.statusClock.textContent = (status.flags & 0x01) !== 0 ? 'Synced' : 'Unsynced';
       ui.statusFirmware.textContent = `v${status.fwVersion}`;
+      updateConfigurationDisplay(status.configId, status.sampleIntervalMs);
     }
 
     function renderLive(record, source = 'notification') {
       latestLiveRecord = record;
-      ui.temperatureValue.textContent = record.tempC.toFixed(2);
-      ui.voltageValue.textContent = `${(record.vbatMv / 1000).toFixed(3)} V`;
+      updateConfigurationDisplay(record.configId, currentSampleIntervalMs);
+      const tempSource = recordTemperatureSource(record);
+      const voltageKind = recordVoltageKind(record);
+      ui.temperatureHeading.textContent = `Current ${tempSource.toLowerCase()} temperature`;
+      ui.temperatureValue.textContent = record.tempC === null ? '—' : record.tempC.toFixed(2);
+      ui.voltageLabel.textContent = voltageKind;
+      ui.voltageValue.textContent = formatNullable(record.voltageV, ' V', 3);
+      ui.humidityValue.textContent = formatNullable(record.humidityPct, ' %RH', 2);
+      ui.luxValue.textContent = formatNullable(record.lux, ' lux', 0);
       ui.sequenceValue.textContent = record.seq.toString();
       ui.rssiValue.textContent = `${record.rssi} dBm`;
       const arrival = new Date().toLocaleTimeString();
-      ui.liveCaption.textContent = `${source === 'read' ? 'Read' : 'Arrived'} at ${arrival}`;
+      const sampleTime = record.epochTs > 0
+        ? ` · sampled ${new Date(record.epochTs * 1000).toLocaleTimeString()}`
+        : ' · timestamp unsynced';
+      ui.liveCaption.textContent = `${source === 'read' ? 'Read' : 'Arrived'} at ${arrival}${sampleTime}`;
+      renderCapabilities();
+    }
+
+    function unsyncedRecordIdentity(record) {
+      const field = (value) => value === null || value === undefined ? 'x' : String(value);
+      return [
+        record.seq,
+        record.tempCenti,
+        field(record.voltageMv),
+        field(record.lux),
+        field(record.humidityCenti),
+        record.rssi,
+        record.flags
+      ].join(':');
+    }
+
+    function recordIdentityKey(record) {
+      return record.epochTs > 0
+        ? `e:${record.epochTs}:${record.seq}`
+        : `u:${unsyncedRecordIdentity(record)}`;
+    }
+
+    function mergeRecordIntoStore(store, record) {
+      const key = recordIdentityKey(record);
+      if (record.epochTs > 0) {
+        // TIMESYNC epoch patching changes only the timestamp. Remove the exact
+        // pre-sync representation when the patched record later arrives.
+        store.delete(`u:${unsyncedRecordIdentity(record)}`);
+      }
+      store.set(key, record);
+      return key;
     }
 
     function sortHistoryRecords() {
-      historyRecords = Array.from(recordsBySeq.values()).sort((a, b) => {
+      historyRecords = Array.from(recordsByIdentity.values()).sort((a, b) => {
         if (a.epochTs !== b.epochTs) return a.epochTs - b.epochTs;
         return a.seq - b.seq;
       });
     }
 
     function mergeRecords(records) {
-      for (const record of records) recordsBySeq.set(record.seq, record);
+      for (const record of records) mergeRecordIntoStore(recordsByIdentity, record);
       sortHistoryRecords();
     }
 
     function resetHeldHistory(message) {
-      recordsBySeq.clear();
+      recordsByIdentity.clear();
       historyRecords = [];
       historyInitialized = false;
       latestLiveRecord = null;
       lastBridgeRecordCount = null;
       ui.temperatureValue.textContent = '--.--';
       ui.voltageValue.textContent = '—';
+      ui.humidityValue.textContent = '—';
+      ui.luxValue.textContent = '—';
       ui.sequenceValue.textContent = '—';
       ui.rssiValue.textContent = '—';
+      ui.temperatureHeading.textContent = 'Current temperature';
+      ui.voltageLabel.textContent = 'Voltage';
       ui.liveCaption.textContent = 'Waiting for a current sample from this bridge.';
       ui.syncProgress.textContent = message;
       renderHistory();
@@ -822,7 +1420,7 @@
         const row = document.createElement('tr');
         row.className = 'empty-row';
         const cell = document.createElement('td');
-        cell.colSpan = 5;
+        cell.colSpan = 8;
         cell.textContent = 'No history loaded.';
         row.append(cell);
         ui.historyBody.append(row);
@@ -833,12 +1431,16 @@
           const values = [
             formatRecordTime(record.epochTs),
             record.seq.toString(),
-            `${record.tempC.toFixed(2)} °C`,
-            `${record.vbatMv} mV`,
+            configurationFor(record.configId).short,
+            record.tempC === null ? '—' : `${record.tempC.toFixed(2)} °C ${recordTemperatureSource(record)}`,
+            record.voltageV === null ? `— ${recordVoltageKind(record)}` : `${record.voltageV.toFixed(3)} V ${recordVoltageKind(record)}`,
+            record.lux === null ? '—' : `${record.lux} lux`,
+            record.humidityPct === null ? '—' : `${record.humidityPct.toFixed(2)} %RH`,
             `${record.rssi} dBm`
           ];
-          values.forEach((value) => {
+          values.forEach((value, index) => {
             const cell = document.createElement('td');
+            if (index === 5 || index === 6) cell.className = 'hat-column';
             cell.textContent = value;
             row.append(cell);
           });
@@ -848,6 +1450,9 @@
       }
 
       renderChart();
+      renderRawStorageChart();
+      renderCapabilities();
+      renderAnalytics();
       updateButtonStates();
     }
 
@@ -876,7 +1481,7 @@
               yAxisID: 'temperature'
             },
             {
-              label: 'Voltage (V)',
+              label: 'VDD (V)',
               data: [],
               parsing: false,
               borderColor: '#65a9ff',
@@ -887,6 +1492,19 @@
               tension: 0.18,
               hidden: true,
               yAxisID: 'voltage'
+            },
+            {
+              label: 'Humidity (%RH)',
+              data: [],
+              parsing: false,
+              borderColor: '#ffcc66',
+              backgroundColor: 'rgba(255, 204, 102, 0.10)',
+              pointRadius: 1.4,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.18,
+              hidden: true,
+              yAxisID: 'humidity'
             }
           ]
         },
@@ -898,7 +1516,14 @@
           normalized: true,
           plugins: {
             legend: {
-              labels: { color: '#b5c1d3', usePointStyle: true, boxWidth: 8 }
+              labels: {
+                color: '#b5c1d3',
+                usePointStyle: true,
+                boxWidth: 8,
+                filter(item, data) {
+                  return data.datasets[item.datasetIndex].data.length > 0;
+                }
+              }
             },
             tooltip: {
               callbacks: {
@@ -938,6 +1563,16 @@
               grid: { drawOnChartArea: false },
               border: { color: 'rgba(148, 163, 184, 0.22)' },
               ticks: { color: '#94a3b8' }
+            },
+            humidity: {
+              display: false,
+              position: 'right',
+              min: 0,
+              max: 100,
+              title: { display: true, text: '%RH', color: '#94a3b8' },
+              grid: { drawOnChartArea: false },
+              border: { color: 'rgba(148, 163, 184, 0.22)' },
+              ticks: { color: '#94a3b8' }
             }
           }
         }
@@ -950,18 +1585,190 @@
         if (!historyChart) return;
       }
 
-      ui.chartFallback.classList.toggle('visible', historyRecords.length === 0);
-      ui.chartFallback.textContent = 'Sync history to populate the chart.';
+      const temperatureData = historyRecords
+        .filter((record) => record.epochTs > 0 && record.tempC !== null)
+        .map((record) => ({ x: record.epochTs * 1000, y: record.tempC }));
+      const vddData = historyRecords
+        .filter((record) => record.epochTs > 0 && record.voltageV !== null && recordVoltageKind(record) === 'VDD')
+        .map((record) => ({ x: record.epochTs * 1000, y: record.voltageV }));
+      const humidityData = historyRecords
+        .filter((record) => record.epochTs > 0 && record.humidityPct !== null)
+        .map((record) => ({ x: record.epochTs * 1000, y: record.humidityPct }));
+      const chartPointCount = temperatureData.length + vddData.length + humidityData.length;
 
-      historyChart.data.datasets[0].data = historyRecords.map((record) => ({
-        x: record.epochTs * 1000,
-        y: record.tempC
-      }));
-      historyChart.data.datasets[1].data = historyRecords.map((record) => ({
-        x: record.epochTs * 1000,
-        y: record.vbatMv / 1000
-      }));
+      ui.chartFallback.classList.toggle('visible', chartPointCount === 0);
+      ui.chartFallback.textContent = historyRecords.length === 0
+        ? 'Sync history to populate the chart.'
+        : 'The held records do not have valid synchronized timestamps.';
+
+      historyChart.data.datasets[0].data = temperatureData;
+      historyChart.data.datasets[1].data = vddData;
+      historyChart.data.datasets[2].data = humidityData;
       historyChart.update('none');
+    }
+
+    function initRawStorageChart() {
+      if (typeof Chart === 'undefined') {
+        ui.rawChartCanvas.hidden = true;
+        ui.rawChartFallback.textContent = 'Chart.js did not load. Raw values remain available in the table and CSV.';
+        ui.rawChartFallback.classList.add('visible');
+        return;
+      }
+
+      rawStorageChart = new Chart(ui.rawChartCanvas, {
+        type: 'line',
+        data: {
+          datasets: [
+            {
+              label: 'VSTOR (V)',
+              data: [],
+              parsing: false,
+              borderColor: '#65a9ff',
+              backgroundColor: 'rgba(101, 169, 255, 0.10)',
+              pointRadius: 1.5,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.12,
+              yAxisID: 'vstor'
+            },
+            {
+              label: 'Illuminance (lux)',
+              data: [],
+              parsing: false,
+              borderColor: '#ffcc66',
+              backgroundColor: 'rgba(255, 204, 102, 0.10)',
+              pointRadius: 1.5,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.12,
+              yAxisID: 'lux'
+            }
+          ]
+        },
+        options: timeSeriesChartOptions({
+          vstor: linearAxis('left', 'V', true),
+          lux: linearAxis('right', 'lux', false, { suggestedMin: 0 })
+        })
+      });
+    }
+
+    function renderRawStorageChart() {
+      if (!rawStorageChart) {
+        initRawStorageChart();
+        if (!rawStorageChart) return;
+      }
+
+      const vstorData = historyRecords
+        .filter((record) => record.epochTs > 0 && record.vstorValid && record.voltageV !== null)
+        .map((record) => ({ x: record.epochTs * 1000, y: record.voltageV }));
+      const luxData = historyRecords
+        .filter((record) => record.epochTs > 0 && record.lux !== null)
+        .map((record) => ({ x: record.epochTs * 1000, y: record.lux }));
+      rawStorageChart.data.datasets[0].data = vstorData;
+      rawStorageChart.data.datasets[1].data = luxData;
+      const empty = vstorData.length === 0 && luxData.length === 0;
+      ui.rawChartFallback.classList.toggle('visible', empty);
+      ui.rawChartFallback.textContent = historyRecords.length === 0
+        ? 'Sync history to populate the chart.'
+        : 'No timestamped VSTOR-valid or illuminance samples are available.';
+      rawStorageChart.update('none');
+    }
+
+    function linearAxis(position, title, drawGrid, extra = {}) {
+      return {
+        position,
+        title: { display: true, text: title, color: '#94a3b8' },
+        grid: drawGrid
+          ? { color: 'rgba(148, 163, 184, 0.08)' }
+          : { drawOnChartArea: false },
+        border: { color: 'rgba(148, 163, 184, 0.22)' },
+        ticks: { color: '#94a3b8' },
+        ...extra
+      };
+    }
+
+    function timeSeriesChartOptions(yAxes) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { intersect: false, mode: 'nearest' },
+        normalized: true,
+        plugins: {
+          legend: {
+            labels: { color: '#b5c1d3', usePointStyle: true, boxWidth: 8 }
+          },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                if (items.length === 0) return '';
+                return new Date(items[0].parsed.x).toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            grid: { color: 'rgba(148, 163, 184, 0.08)' },
+            border: { color: 'rgba(148, 163, 184, 0.22)' },
+            ticks: {
+              color: '#94a3b8',
+              maxRotation: 0,
+              callback(value) {
+                return new Date(Number(value)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              }
+            }
+          },
+          ...yAxes
+        }
+      };
+    }
+
+    function renderCapabilities() {
+      const config = configurationFor(currentConfigId);
+      const hasVstorHistory = historyRecords.some((record) => record.vstorValid);
+      const liveHasVstor = Boolean(latestLiveRecord && latestLiveRecord.vstorValid);
+      const hasHatHistory = historyRecords.some((record) =>
+        record.ambientTemperature || record.humidityPct !== null || record.lux !== null || record.vstorValid
+      );
+      const liveHasHatFields = Boolean(latestLiveRecord && (
+        latestLiveRecord.ambientTemperature ||
+        latestLiveRecord.humidityPct !== null ||
+        latestLiveRecord.lux !== null ||
+        latestLiveRecord.vstorValid
+      ));
+      const showHat = config.hat || (!config.bare && (hasHatHistory || liveHasHatFields));
+      for (const element of ui.hatFields) element.hidden = !showHat;
+      for (const element of document.querySelectorAll('.hat-column')) element.hidden = !showHat;
+
+      ui.rawStorageSection.hidden = config.bare || !showHat;
+      const hasPowerCapability = config.hat || hasVstorHistory || liveHasVstor;
+      ui.powerSection.hidden =
+        config.bare ||
+        (!latestStatus && !latestLiveRecord) ||
+        !hasPowerCapability;
+      ui.chartTitle.textContent = showHat
+        ? 'Temperature and humidity history'
+        : 'Temperature and VDD history';
+      ui.chartCanvas.setAttribute(
+        'aria-label',
+        showHat
+          ? 'Temperature and humidity history chart'
+          : 'Temperature and regulated VDD history chart'
+      );
+      if (latestLiveRecord && latestLiveRecord.configId === currentConfigId) {
+        ui.temperatureHeading.textContent =
+          `Current ${recordTemperatureSource(latestLiveRecord).toLowerCase()} temperature`;
+        ui.voltageLabel.textContent = recordVoltageKind(latestLiveRecord);
+      } else {
+        ui.temperatureHeading.textContent = config.hat
+          ? 'Current ambient temperature'
+          : config.bare
+            ? 'Current MCU die temperature'
+            : 'Current temperature';
+        ui.voltageLabel.textContent = config.hat ? 'VSTOR' : 'VDD';
+      }
     }
 
     function resetStatusDisplay() {
@@ -970,12 +1777,16 @@
       ui.statusRssi.textContent = '—';
       ui.statusClock.textContent = '—';
       ui.statusFirmware.textContent = '—';
+      ui.statusConfiguration.textContent = '—';
+      ui.statusInterval.textContent = '—';
+      ui.statusRetention.textContent = '—';
     }
 
     function removeCharacteristicListeners() {
       if (!ble.characteristics) return;
       ble.characteristics.live.removeEventListener('characteristicvaluechanged', handleLiveNotification);
       ble.characteristics.histData.removeEventListener('characteristicvaluechanged', handleHistoryNotification);
+      ble.characteristics.status.removeEventListener('characteristicvaluechanged', handleStatusNotification);
     }
 
     function clearGattState() {
@@ -984,6 +1795,7 @@
       ble.characteristics = null;
       ble.ready = false;
       ble.historyNotificationsStarted = false;
+      ble.protocolValidated = false;
     }
 
     function abortActiveSync(error) {
@@ -1000,7 +1812,13 @@
       ble.connectionGeneration += 1;
       abortActiveSync(new Error('The bridge disconnected during history sync.'));
       clearGattState();
-      if (requested) {
+      if (ble.protocolFailureMessage) {
+        const message = ble.protocolFailureMessage;
+        ble.protocolFailureMessage = null;
+        setConnectionState('error', 'Protocol mismatch');
+        ui.liveCaption.textContent = 'Connection closed because the bridge protocol changed.';
+        showError(message);
+      } else if (requested) {
         clearError();
         setConnectionState('idle', 'Disconnected');
         ui.liveCaption.textContent = 'Disconnected. Tap Reconnect to use the same bridge.';
@@ -1014,6 +1832,9 @@
 
     function handleLiveNotification(event) {
       try {
+        if (!ble.protocolValidated) {
+          throw new Error('Protocol gate is not complete; LIVE record was ignored.');
+        }
         const value = event.target.value;
         if (!value || value.byteLength !== RECORD_BYTES) {
           throw new RangeError(`Invalid LIVE length: expected ${RECORD_BYTES} bytes, received ${value ? value.byteLength : 0}.`);
@@ -1026,7 +1847,7 @@
         // LIVE sample that arrives during a transfer and merge it only after the
         // history end marker, so a long small-MTU transfer cannot create a gap.
         if (activeSync) {
-          activeSync.liveRecordsBySeq.set(record.seq, record);
+          mergeRecordIntoStore(activeSync.liveRecordsByIdentity, record);
         } else if (historyInitialized) {
           mergeRecords([record]);
           renderHistory();
@@ -1050,6 +1871,9 @@
       if (!sync || sync.settled) return;
 
       try {
+        if (!ble.protocolValidated) {
+          throw new Error('Protocol gate is not complete; history data was ignored.');
+        }
         const view = asDataView(event.target.value);
         resetSyncWatchdog(sync);
 
@@ -1069,7 +1893,7 @@
 
         for (let index = 0; index < count; index += 1) {
           const record = parseRecord(view, 1 + index * RECORD_BYTES);
-          sync.recordsBySeq.set(record.seq, record);
+          mergeRecordIntoStore(sync.recordsByIdentity, record);
         }
         sync.received += count;
         ui.syncProgress.textContent = `Receiving history · ${sync.received.toLocaleString()} records received`;
@@ -1081,19 +1905,43 @@
       }
     }
 
-    async function readAndRenderStatus() {
-      if (!ble.characteristics) throw new Error('Bridge characteristics are unavailable.');
-      const value = await ble.characteristics.status.readValue();
-      const status = parseStatus(value);
-
-      // A lower count than previously observed indicates the v1 bridge likely
-      // rebooted and cleared its RAM history. Drop stale page data so the next
-      // sync starts at epoch 0 instead of skipping the new boot's records.
+    function applyValidatedStatus(status) {
+      // A lower retained count indicates that the bridge restarted or its
+      // retained history was cleared. Reset the incremental epoch boundary.
       if (lastBridgeRecordCount !== null && status.recordCount < lastBridgeRecordCount) {
         resetHeldHistory('Bridge restart detected; local history was reset.');
       }
       lastBridgeRecordCount = status.recordCount;
       renderStatus(status);
+    }
+
+    function handleStatusNotification(event) {
+      try {
+        if (!ble.protocolValidated) {
+          throw new Error('Received STATUS before the Protocol v3 gate completed.');
+        }
+        const status = parseStatus(event.target.value);
+        applyValidatedStatus(status);
+      } catch (error) {
+        const message = `STATUS notification rejected. ${describeError(error)}`;
+        ble.protocolValidated = false;
+        ble.ready = false;
+        ble.protocolFailureMessage = message;
+        abortActiveSync(new Error(message));
+        setConnectionState('error', 'Protocol mismatch');
+        showError(message);
+        updateButtonStates();
+        if (ble.device && ble.device.gatt && ble.device.gatt.connected) {
+          ble.device.gatt.disconnect();
+        }
+      }
+    }
+
+    async function readAndRenderStatus() {
+      if (!ble.characteristics) throw new Error('Bridge characteristics are unavailable.');
+      const value = await ble.characteristics.status.readValue();
+      const status = parseStatus(value);
+      applyValidatedStatus(status);
       return status;
     }
 
@@ -1110,14 +1958,23 @@
       if (generation !== ble.connectionGeneration) throw new Error('Connection was superseded.');
 
       ble.characteristics = { live, histCtrl, histData, timesync, status };
-      live.addEventListener('characteristicvaluechanged', handleLiveNotification);
-      histData.addEventListener('characteristicvaluechanged', handleHistoryNotification);
 
-      // The required post-connect order is time sync, status, LIVE subscription,
-      // then one initial LIVE read.
+      // STATUS is the hard protocol gate. Nothing writes TIMESYNC, subscribes
+      // to LIVE, or installs a record handler until exact v3 length/version
+      // validation succeeds.
+      const initialStatus = parseStatus(await status.readValue());
+      ble.protocolValidated = true;
+      applyValidatedStatus(initialStatus);
+      status.addEventListener('characteristicvaluechanged', handleStatusNotification);
+      await status.startNotifications();
+      const bridgeStatus = await readAndRenderStatus();
+
       const nowEpoch = Math.floor(Date.now() / 1000);
       await writeCharacteristic(timesync, uint32LE(nowEpoch));
-      const bridgeStatus = await readAndRenderStatus();
+      await readAndRenderStatus();
+
+      live.addEventListener('characteristicvaluechanged', handleLiveNotification);
+      histData.addEventListener('characteristicvaluechanged', handleHistoryNotification);
       await live.startNotifications();
       const liveValue = await live.readValue();
 
@@ -1137,6 +1994,7 @@
           ble.connecting || ble.disconnecting || isConnected()) return;
 
       clearError();
+      ble.protocolFailureMessage = null;
       ble.connecting = true;
       ble.ready = false;
       const useExistingDevice = Boolean(ble.device && !ble.pickerOnNextAttempt);
@@ -1170,6 +2028,7 @@
         setConnectionState('connected', `Connected to ${ble.device.name || 'TempBridge'}`);
       } catch (error) {
         const detail = describeError(error);
+        if (detail.includes('Protocol mismatch')) ble.protocolFailureMessage = detail;
         clearGattState();
 
         if (ble.device && ble.device.gatt && ble.device.gatt.connected) {
@@ -1220,9 +2079,9 @@
       const sync = {
         sinceEpoch,
         received: 0,
-        recordsBySeq: new Map(),
-        liveRecordsBySeq: new Map(),
-        heldBefore: recordsBySeq.size,
+        recordsByIdentity: new Map(),
+        liveRecordsByIdentity: new Map(),
+        heldBefore: recordsByIdentity.size,
         committed: false,
         watchdog: 0,
         settled: false,
@@ -1253,8 +2112,8 @@
         if (!sync.settled) resetSyncWatchdog(sync);
         await completion;
 
-        mergeRecords(sync.recordsBySeq.values());
-        mergeRecords(sync.liveRecordsBySeq.values());
+        mergeRecords(sync.recordsByIdentity.values());
+        mergeRecords(sync.liveRecordsByIdentity.values());
         historyInitialized = true;
 
         // Include the current LIVE value after the first full sync; this never
@@ -1283,10 +2142,10 @@
           // LIVE can fire while the post-sync STATUS read is in flight. Merge
           // the transfer-side map once more before clearing activeSync so that
           // even that narrow window remains lossless.
-          mergeRecords(sync.liveRecordsBySeq.values());
+          mergeRecords(sync.liveRecordsByIdentity.values());
           if (latestLiveRecord) mergeRecords([latestLiveRecord]);
           renderHistory();
-          const changed = Math.max(0, recordsBySeq.size - sync.heldBefore);
+          const changed = Math.max(0, recordsByIdentity.size - sync.heldBefore);
           ui.syncProgress.textContent = `Sync complete · ${sync.received.toLocaleString()} received · ${changed.toLocaleString()} new · ${historyRecords.length.toLocaleString()} total`;
         }
         if (activeSync === sync) activeSync = null;
@@ -1306,14 +2165,21 @@
       if (activeSync || historyRecords.length === 0) return;
 
       try {
-        const rows = ['timestamp_iso,seq,temp_c,vbat_mv,rssi'];
+        const rows = [
+          'timestamp_iso,seq,config_id,temp_source,temp_c,voltage_kind,voltage_v,lux,humidity_pct,rssi'
+        ];
         for (const record of historyRecords) {
           const timestamp = record.epochTs === 0 ? '' : new Date(record.epochTs * 1000).toISOString();
           rows.push([
             timestamp,
             record.seq,
-            record.tempC.toFixed(2),
-            record.vbatMv,
+            record.configId,
+            record.ambientTemperature ? 'ambient' : 'mcu_die',
+            record.tempC === null ? '' : record.tempC.toFixed(2),
+            recordVoltageKind(record),
+            record.voltageV === null ? '' : record.voltageV.toFixed(3),
+            record.lux === null ? '' : record.lux,
+            record.humidityPct === null ? '' : record.humidityPct.toFixed(2),
             record.rssi
           ].map(csvEscape).join(','));
         }
@@ -1333,6 +2199,753 @@
       }
     }
 
+    // BEGIN PURE ANALYTICS
+    function median(values) {
+      const finite = values.filter(Number.isFinite).sort((a, b) => a - b);
+      if (finite.length === 0) return null;
+      const middle = Math.floor(finite.length / 2);
+      return finite.length % 2 === 0
+        ? (finite[middle - 1] + finite[middle]) / 2
+        : finite[middle];
+    }
+
+    function medianPositiveSpacingS(points) {
+      const spacings = [];
+      for (let index = 1; index < points.length; index += 1) {
+        const spacing = points[index].epochTs - points[index - 1].epochTs;
+        if (Number.isFinite(spacing) && spacing > 0) spacings.push(spacing);
+      }
+      return median(spacings);
+    }
+
+    function centeredLeastSquaresSlope(points) {
+      if (!Array.isArray(points) || points.length < 2) return null;
+      let meanTime = 0;
+      let meanVoltage = 0;
+      for (const point of points) {
+        if (!Number.isFinite(point.epochTs) || !Number.isFinite(point.voltageV)) return null;
+        meanTime += point.epochTs;
+        meanVoltage += point.voltageV;
+      }
+      meanTime /= points.length;
+      meanVoltage /= points.length;
+
+      let numerator = 0;
+      let denominator = 0;
+      for (const point of points) {
+        const centeredTime = point.epochTs - meanTime;
+        numerator += centeredTime * (point.voltageV - meanVoltage);
+        denominator += centeredTime * centeredTime;
+      }
+      if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
+      const slope = numerator / denominator;
+      return Number.isFinite(slope) ? slope : null;
+    }
+
+    function selectValidVstorSamples(records) {
+      return records
+        .filter((record) =>
+          record &&
+          record.vstorValid === true &&
+          Number.isFinite(record.epochTs) &&
+          record.epochTs > 0 &&
+          Number.isFinite(record.voltageV) &&
+          record.voltageV > 0
+        )
+        .map((record) => ({
+          epochTs: record.epochTs,
+          seq: record.seq,
+          voltageV: record.voltageV,
+          lux: Number.isFinite(record.lux) ? record.lux : null
+        }))
+        .sort((a, b) => a.epochTs - b.epochTs || (a.seq || 0) - (b.seq || 0));
+    }
+
+    function computeNetStoragePower(records, capacitanceF, windowMinutes) {
+      const capacitance = Number(capacitanceF);
+      const windowSeconds = Number(windowMinutes) * 60;
+      const samples = selectValidVstorSamples(records);
+      const spacingS = medianPositiveSpacingS(samples);
+      if (!Number.isFinite(capacitance) || capacitance <= 0 ||
+          !Number.isFinite(windowSeconds) || windowSeconds <= 0 ||
+          !Number.isFinite(spacingS) || spacingS <= 0) {
+        return Object.freeze({
+          points: Object.freeze([]),
+          spacingS: Number.isFinite(spacingS) ? spacingS : null,
+          sourceSampleCount: samples.length,
+          windowSeconds: Number.isFinite(windowSeconds) ? windowSeconds : null
+        });
+      }
+
+      const points = [];
+      let left = 0;
+      for (let right = 0; right < samples.length; right += 1) {
+        const current = samples[right];
+        while (left < right && samples[left].epochTs < current.epochTs - windowSeconds) left += 1;
+        const windowPoints = samples.slice(left, right + 1);
+        if (windowPoints.length < 6) continue;
+
+        let hasLargeGap = false;
+        for (let index = 1; index < windowPoints.length; index += 1) {
+          const gap = windowPoints[index].epochTs - windowPoints[index - 1].epochTs;
+          if (Number.isFinite(gap) && gap > 3 * spacingS) {
+            hasLargeGap = true;
+            break;
+          }
+        }
+        if (hasLargeGap) continue;
+
+        const slopeVPerS = centeredLeastSquaresSlope(windowPoints);
+        if (!Number.isFinite(slopeVPerS)) continue;
+        const powerW = capacitance * current.voltageV * slopeVPerS;
+        const powerUw = powerW * 1e6;
+        if (!Number.isFinite(powerW) || !Number.isFinite(powerUw)) continue;
+        points.push(Object.freeze({
+          epochTs: current.epochTs,
+          seq: current.seq,
+          voltageV: current.voltageV,
+          lux: current.lux,
+          slopeVPerS,
+          powerW,
+          powerUw,
+          regressionPointCount: windowPoints.length,
+          regressionSpanS: current.epochTs - windowPoints[0].epochTs
+        }));
+      }
+
+      return Object.freeze({
+        points: Object.freeze(points),
+        spacingS,
+        sourceSampleCount: samples.length,
+        windowSeconds
+      });
+    }
+
+    function integratePowerJ(points, maxGapS = null) {
+      const sorted = points
+        .filter((point) => point && Number.isFinite(point.epochTs) && Number.isFinite(point.powerUw))
+        .slice()
+        .sort((a, b) => a.epochTs - b.epochTs);
+      const inferredSpacing = medianPositiveSpacingS(sorted);
+      const allowedGap = Number.isFinite(maxGapS) && maxGapS > 0
+        ? maxGapS
+        : Number.isFinite(inferredSpacing)
+          ? 3 * inferredSpacing
+          : null;
+      let energyJ = 0;
+      let coverageS = 0;
+      let segmentCount = 0;
+      for (let index = 1; index < sorted.length; index += 1) {
+        const previous = sorted[index - 1];
+        const current = sorted[index];
+        const durationS = current.epochTs - previous.epochTs;
+        if (!Number.isFinite(durationS) || durationS <= 0 ||
+            (Number.isFinite(allowedGap) && durationS > allowedGap)) continue;
+        const segmentJ = ((previous.powerUw + current.powerUw) / 2) * durationS * 1e-6;
+        if (!Number.isFinite(segmentJ)) continue;
+        energyJ += segmentJ;
+        coverageS += durationS;
+        segmentCount += 1;
+      }
+      return Object.freeze({ energyJ, coverageS, segmentCount });
+    }
+
+    function darkBandToleranceUw(lowerDrainUw) {
+      return Math.max(5, 0.2 * Math.abs(lowerDrainUw));
+    }
+
+    function compareDarkCandidates(lower, higher) {
+      if (!lower.available || !higher.available) {
+        return Object.freeze({
+          lowerThreshold: lower.thresholdLux,
+          higherThreshold: higher.thresholdLux,
+          available: false,
+          stable: false,
+          contaminated: false,
+          differenceUw: null,
+          toleranceUw: null
+        });
+      }
+      const differenceUw = higher.drainUw - lower.drainUw;
+      const toleranceUw = darkBandToleranceUw(lower.drainUw);
+      return Object.freeze({
+        lowerThreshold: lower.thresholdLux,
+        higherThreshold: higher.thresholdLux,
+        available: true,
+        stable: Math.abs(differenceUw) <= toleranceUw,
+        contaminated: differenceUw > toleranceUw,
+        differenceUw,
+        toleranceUw
+      });
+    }
+
+    function estimateDarkBaseline(powerPoints, windowMinutes, thresholds = [1, 3, 5]) {
+      const windowSeconds = Number(windowMinutes) * 60;
+      const candidates = thresholds.map((thresholdLux) => {
+        const samples = powerPoints
+          .filter((point) =>
+            point &&
+            Number.isFinite(point.epochTs) &&
+            Number.isFinite(point.powerUw) &&
+            Number.isFinite(point.lux) &&
+            point.lux < thresholdLux
+          )
+          .slice()
+          .sort((a, b) => a.epochTs - b.epochTs);
+        const coveredDurationS = samples.length > 1
+          ? samples[samples.length - 1].epochTs - samples[0].epochTs
+          : 0;
+        const enoughSamples = samples.length >= 30;
+        const enoughDuration = Number.isFinite(windowSeconds) &&
+          windowSeconds > 0 &&
+          coveredDurationS >= windowSeconds;
+        const drainUw = enoughSamples && enoughDuration
+          ? median(samples.map((point) => -point.powerUw))
+          : null;
+        return {
+          thresholdLux,
+          sampleCount: samples.length,
+          coveredDurationS,
+          enoughSamples,
+          enoughDuration,
+          available: Number.isFinite(drainUw),
+          drainUw,
+          contaminatedByLowerBand: false
+        };
+      });
+
+      const comparisons = [
+        compareDarkCandidates(candidates[0], candidates[1]),
+        compareDarkCandidates(candidates[1], candidates[2])
+      ];
+      comparisons.forEach((comparison, index) => {
+        if (comparison.contaminated) candidates[index + 1].contaminatedByLowerBand = true;
+      });
+
+      let acceptedIndex = null;
+      let supportIndex = null;
+      let rejectedNonPositive = false;
+      if (comparisons[0].stable) {
+        if (candidates[0].drainUw > 0) {
+          acceptedIndex = 0;
+          supportIndex = 1;
+        } else {
+          rejectedNonPositive = true;
+        }
+      }
+      if (acceptedIndex === null &&
+          comparisons[1].stable &&
+          !candidates[1].contaminatedByLowerBand) {
+        if (candidates[1].drainUw > 0) {
+          acceptedIndex = 1;
+          supportIndex = 2;
+        } else {
+          rejectedNonPositive = true;
+        }
+      }
+
+      let baselineUw = null;
+      let confidence = 'Unavailable';
+      if (acceptedIndex !== null) {
+        baselineUw = candidates[acceptedIndex].drainUw;
+        const support = candidates[supportIndex];
+        const bothPairsStable = comparisons.every((comparison) => comparison.stable);
+        const doubleCoverage = support.coveredDurationS >= 2 * windowSeconds;
+        const doubleSamples = support.sampleCount >= 60;
+        confidence = bothPairsStable && doubleCoverage && doubleSamples
+          ? 'High'
+          : bothPairsStable || doubleCoverage || doubleSamples
+            ? 'Moderate'
+            : 'Low';
+      }
+
+      return Object.freeze({
+        candidates: Object.freeze(candidates.map((candidate) => Object.freeze(candidate))),
+        comparisons: Object.freeze(comparisons),
+        acceptedIndex,
+        supportIndex,
+        baselineUw,
+        confidence,
+        windowSeconds,
+        rejectionReason: rejectedNonPositive && acceptedIndex === null
+          ? 'Stable dark-drain estimate was non-positive.'
+          : null
+      });
+    }
+
+    function estimateHarvestPoints(powerPoints, baselineUw) {
+      if (!Number.isFinite(baselineUw) || baselineUw <= 0) return Object.freeze([]);
+      return Object.freeze(powerPoints
+        .filter((point) => point && Number.isFinite(point.epochTs) && Number.isFinite(point.powerUw))
+        .map((point) => Object.freeze({
+          epochTs: point.epochTs,
+          seq: point.seq,
+          lux: Number.isFinite(point.lux) ? point.lux : null,
+          powerUw: Math.max(0, point.powerUw + baselineUw)
+        })));
+    }
+
+    function fitHarvestLuxSlope(points) {
+      let numerator = 0;
+      let denominator = 0;
+      for (const point of points) {
+        if (!Number.isFinite(point.lux) || point.lux < 0 || !Number.isFinite(point.powerUw)) continue;
+        numerator += point.lux * point.powerUw;
+        denominator += point.lux * point.lux;
+      }
+      if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
+      const slope = numerator / denominator;
+      return Number.isFinite(slope) ? slope : null;
+    }
+
+    function localDateKey(epochTs) {
+      const date = new Date(epochTs * 1000);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function localDayBounds(epochTs) {
+      const date = new Date(epochTs * 1000);
+      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 1000;
+      const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime() / 1000;
+      return { start, end };
+    }
+
+    function integrateDailyEnergy(points) {
+      const sorted = points
+        .filter((point) => point && Number.isFinite(point.epochTs) && Number.isFinite(point.powerUw))
+        .slice()
+        .sort((a, b) => a.epochTs - b.epochTs);
+      const spacingS = medianPositiveSpacingS(sorted);
+      const allowedGapS = Number.isFinite(spacingS) ? 3 * spacingS : null;
+      const days = new Map();
+
+      for (let index = 1; index < sorted.length; index += 1) {
+        const from = sorted[index - 1];
+        const to = sorted[index];
+        const totalDurationS = to.epochTs - from.epochTs;
+        if (!Number.isFinite(totalDurationS) || totalDurationS <= 0 ||
+            (Number.isFinite(allowedGapS) && totalDurationS > allowedGapS)) continue;
+
+        let cursor = from.epochTs;
+        while (cursor < to.epochTs) {
+          const bounds = localDayBounds(cursor);
+          const segmentEnd = Math.min(to.epochTs, bounds.end);
+          const startFraction = (cursor - from.epochTs) / totalDurationS;
+          const endFraction = (segmentEnd - from.epochTs) / totalDurationS;
+          const startPowerUw = from.powerUw + (to.powerUw - from.powerUw) * startFraction;
+          const endPowerUw = from.powerUw + (to.powerUw - from.powerUw) * endFraction;
+          const durationS = segmentEnd - cursor;
+          const energyJ = ((startPowerUw + endPowerUw) / 2) * durationS * 1e-6;
+          const key = localDateKey(cursor);
+          const aggregate = days.get(key) || {
+            date: key,
+            energyJ: 0,
+            coverageS: 0,
+            dayLengthS: bounds.end - bounds.start
+          };
+          if (Number.isFinite(energyJ) && durationS > 0) {
+            aggregate.energyJ += energyJ;
+            aggregate.coverageS += durationS;
+          }
+          days.set(key, aggregate);
+          cursor = segmentEnd;
+        }
+      }
+
+      return Object.freeze(Array.from(days.values())
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((day) => Object.freeze({
+          ...day,
+          complete: day.coverageS >= 0.95 * day.dayLengthS
+        })));
+    }
+
+    function runNamedTests(tests) {
+      const results = tests.map(([name, test]) => {
+        try {
+          const detail = test();
+          return Object.freeze({ name, pass: true, detail: detail === undefined ? 'ok' : detail });
+        } catch (error) {
+          return Object.freeze({ name, pass: false, detail: error.message });
+        }
+      });
+      const failed = results.filter((result) => !result.pass);
+      if (failed.length > 0) {
+        throw new Error(failed.map((result) => `${result.name}: ${result.detail}`).join('; '));
+      }
+      return Object.freeze({ pass: true, tests: Object.freeze(results) });
+    }
+
+    function testAssert(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+
+    function syntheticVstorRecord(epochTs, voltageV, lux = 0, seq = 0) {
+      return { epochTs, voltageV, lux, seq, vstorValid: true };
+    }
+
+    function powerMathSelfTest() {
+      const endTs = 10000;
+      const rampSlope = 36e-6;
+      const ramp = Array.from({ length: 6 }, (_, index) => {
+        const epochTs = endTs - (5 - index) * 60;
+        return syntheticVstorRecord(epochTs, 3.8 + rampSlope * (epochTs - endTs), 0, index);
+      });
+      const flat = ramp.map((record) => ({ ...record, voltageV: 3.8 }));
+      const falling = ramp.map((record) => ({
+        ...record,
+        voltageV: 3.8 - rampSlope * (record.epochTs - endTs)
+      }));
+      const gapTimes = [1000, 1060, 1120, 1180, 1240, 1300, 1900];
+      const gapRecords = gapTimes.map((epochTs, index) =>
+        syntheticVstorRecord(epochTs, 3.7 + index * 0.001, 0, index)
+      );
+      const excluded = ramp.concat([
+        { epochTs: endTs + 60, voltageV: null, lux: 0, seq: 7, vstorValid: true },
+        { epochTs: endTs + 120, voltageV: 3.9, lux: 0, seq: 8, vstorValid: false },
+        { epochTs: 0, voltageV: 3.9, lux: 0, seq: 9, vstorValid: true }
+      ]);
+
+      return runNamedTests([
+        ['linear voltage ramp', () => {
+          const result = computeNetStoragePower(ramp, 1, 10);
+          const actual = result.points.at(-1).powerUw;
+          testAssert(Math.abs(actual - 136.8) < 0.05, `expected 136.8 uW, got ${actual}`);
+          return `${actual.toFixed(3)} uW`;
+        }],
+        ['flat voltage', () => {
+          const actual = computeNetStoragePower(flat, 1, 10).points.at(-1).powerUw;
+          testAssert(Math.abs(actual) < 1e-8, `expected zero, got ${actual}`);
+        }],
+        ['falling voltage', () => {
+          const actual = computeNetStoragePower(falling, 1, 10).points.at(-1).powerUw;
+          testAssert(actual < 0, `expected negative power, got ${actual}`);
+        }],
+        ['large gap invalidation', () => {
+          const result = computeNetStoragePower(gapRecords, 1, 20);
+          testAssert(!result.points.some((point) => point.epochTs === 1900), 'gap-affected estimate was not rejected');
+        }],
+        ['sentinel and null exclusion', () => {
+          const result = computeNetStoragePower(excluded, 1, 10);
+          testAssert(result.sourceSampleCount === 6, `expected 6 valid samples, got ${result.sourceSampleCount}`);
+        }],
+        ['constant-power integration', () => {
+          const integral = integratePowerJ([
+            { epochTs: 1, powerUw: 100 },
+            { epochTs: 11, powerUw: 100 },
+            { epochTs: 21, powerUw: 100 }
+          ]);
+          testAssert(Math.abs(integral.energyJ - 0.002) < 1e-12, `expected 0.002 J, got ${integral.energyJ}`);
+          return `${integral.energyJ} J`;
+        }]
+      ]);
+    }
+
+    function inferenceMathSelfTest() {
+      const stablePoints = [];
+      for (let index = 0; index < 60; index += 1) {
+        const epochTs = 1000 + index * 60;
+        stablePoints.push({ epochTs, powerUw: -20, lux: 0.5 });
+        stablePoints.push({ epochTs, powerUw: -21, lux: 2 });
+        stablePoints.push({ epochTs, powerUw: -21.5, lux: 4 });
+      }
+      const contaminatedPoints = [];
+      for (let index = 0; index < 60; index += 1) {
+        const epochTs = 1000 + index * 60;
+        contaminatedPoints.push({ epochTs, powerUw: -20, lux: 0.5 });
+        contaminatedPoints.push({ epochTs, powerUw: -40, lux: 2 });
+      }
+
+      return runNamedTests([
+        ['stable 1/3/5 lux bands', () => {
+          const result = estimateDarkBaseline(stablePoints, 45);
+          testAssert(result.acceptedIndex === 0, `expected <1 lux, got index ${result.acceptedIndex}`);
+          testAssert(Math.abs(result.baselineUw - 20) < 1e-9, `expected 20 uW, got ${result.baselineUw}`);
+        }],
+        ['material light contamination', () => {
+          const result = estimateDarkBaseline(contaminatedPoints, 45);
+          testAssert(result.comparisons[0].contaminated, 'expected <3 lux band to be contaminated');
+          testAssert(result.acceptedIndex === null, 'contaminated higher band was accepted');
+        }],
+        ['minimum dark coverage', () => {
+          const short = stablePoints.filter((_, index) => index < 29);
+          const result = estimateDarkBaseline(short, 45);
+          testAssert(result.baselineUw === null, 'insufficient dark data produced a baseline');
+        }],
+        ['non-positive drain rejection', () => {
+          const chargingInDark = stablePoints.map((point) => ({ ...point, powerUw: 5 }));
+          const result = estimateDarkBaseline(chargingInDark, 45);
+          testAssert(result.baselineUw === null && result.rejectionReason,
+            'non-positive dark drain was converted into a baseline');
+        }],
+        ['nonnegative harvest estimate', () => {
+          const inferred = estimateHarvestPoints([
+            { epochTs: 1, powerUw: -30, lux: 0 },
+            { epochTs: 2, powerUw: 10, lux: 10 }
+          ], 20);
+          testAssert(inferred[0].powerUw === 0 && inferred[1].powerUw === 30, 'harvest clamp or offset is wrong');
+        }]
+      ]);
+    }
+    // END PURE ANALYTICS
+
+    function loadAnalyticsSettings() {
+      const defaults = { capacitanceF: 1, regressionWindowMinutes: 45 };
+      try {
+        const parsed = JSON.parse(localStorage.getItem(ANALYTICS_SETTINGS_KEY) || 'null');
+        if (!parsed || !Number.isFinite(parsed.capacitanceF) || parsed.capacitanceF <= 0 ||
+            !Number.isFinite(parsed.regressionWindowMinutes) || parsed.regressionWindowMinutes <= 0) {
+          return defaults;
+        }
+        return {
+          capacitanceF: parsed.capacitanceF,
+          regressionWindowMinutes: parsed.regressionWindowMinutes
+        };
+      } catch (_error) {
+        return defaults;
+      }
+    }
+
+    function saveAnalyticsSettings() {
+      try {
+        localStorage.setItem(ANALYTICS_SETTINGS_KEY, JSON.stringify(analyticsSettings));
+      } catch (_error) {
+        // Storage can be disabled in privacy modes; calculations still work.
+      }
+    }
+
+    function updateAnalyticsSettings() {
+      const capacitanceF = Number(ui.capacitanceInput.value);
+      const regressionWindowMinutes = Number(ui.regressionWindowInput.value);
+      if (!Number.isFinite(capacitanceF) || capacitanceF <= 0 ||
+          !Number.isFinite(regressionWindowMinutes) || regressionWindowMinutes <= 0) {
+        showError('Power settings must both be finite values greater than zero.');
+        ui.capacitanceInput.value = String(analyticsSettings.capacitanceF);
+        ui.regressionWindowInput.value = String(analyticsSettings.regressionWindowMinutes);
+        return;
+      }
+      clearError();
+      analyticsSettings = { capacitanceF, regressionWindowMinutes };
+      saveAnalyticsSettings();
+      renderAnalytics();
+    }
+
+    function initPowerCharts() {
+      if (typeof Chart === 'undefined') {
+        ui.powerChartCanvas.hidden = true;
+        ui.harvestChartCanvas.hidden = true;
+        ui.powerChartFallback.textContent = 'Chart.js did not load. Calculated summaries remain available.';
+        ui.harvestChartFallback.textContent = 'Chart.js did not load. Calculated summaries remain available.';
+        ui.powerChartFallback.classList.add('visible');
+        ui.harvestChartFallback.classList.add('visible');
+        return;
+      }
+      if (!powerChart) {
+        powerChart = new Chart(ui.powerChartCanvas, {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'Net storage power (µW)',
+              data: [],
+              parsing: false,
+              borderColor: '#44d7b6',
+              backgroundColor: 'rgba(68, 215, 182, 0.10)',
+              pointRadius: 1.4,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.12,
+              yAxisID: 'power'
+            }]
+          },
+          options: timeSeriesChartOptions({ power: linearAxis('left', 'µW', true) })
+        });
+      }
+      if (!harvestChart) {
+        harvestChart = new Chart(ui.harvestChartCanvas, {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'Estimated panel harvest into VSTOR (µW)',
+              data: [],
+              parsing: false,
+              borderColor: '#ffcc66',
+              backgroundColor: 'rgba(255, 204, 102, 0.10)',
+              pointRadius: 1.4,
+              pointHoverRadius: 5,
+              borderWidth: 2,
+              tension: 0.12,
+              yAxisID: 'power'
+            }]
+          },
+          options: timeSeriesChartOptions({
+            power: linearAxis('left', 'µW estimated', true, { suggestedMin: 0 })
+          })
+        });
+      }
+    }
+
+    function renderCandidateCards(inference) {
+      ui.candidateGrid.replaceChildren();
+      const fragment = document.createDocumentFragment();
+      for (const candidate of inference.candidates) {
+        const card = document.createElement('div');
+        card.className = 'candidate';
+        const label = document.createElement('span');
+        label.textContent = `< ${candidate.thresholdLux} lux`;
+        const value = document.createElement('strong');
+        value.textContent = candidate.available ? `${candidate.drainUw.toFixed(1)} µW` : 'Unavailable';
+        const detail = document.createElement('small');
+        const requirements = `${candidate.sampleCount} samples · ${formatDurationSeconds(candidate.coveredDurationS)}`;
+        if (candidate.contaminatedByLowerBand) {
+          detail.textContent = `${requirements} · contaminated by residual light`;
+        } else if (!candidate.enoughSamples) {
+          detail.textContent = `${requirements} · need at least 30 samples`;
+        } else if (!candidate.enoughDuration) {
+          detail.textContent = `${requirements} · need one full regression window`;
+        } else {
+          detail.textContent = requirements;
+        }
+        card.append(label, value, detail);
+        fragment.append(card);
+      }
+      ui.candidateGrid.append(fragment);
+    }
+
+    function formatEnergy(energyJ) {
+      if (!Number.isFinite(energyJ)) return '—';
+      const milliWattHours = energyJ / 3.6;
+      return Math.abs(milliWattHours) < 0.01
+        ? `${(milliWattHours * 1000).toFixed(2)} µWh`
+        : `${milliWattHours.toFixed(3)} mWh`;
+    }
+
+    function renderDailyEnergy(days) {
+      ui.dailyEnergyBody.replaceChildren();
+      if (days.length === 0) {
+        const row = document.createElement('tr');
+        row.className = 'empty-row';
+        const cell = document.createElement('td');
+        cell.colSpan = 4;
+        cell.textContent = 'No accepted harvest estimate.';
+        row.append(cell);
+        ui.dailyEnergyBody.append(row);
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      for (const day of days.slice(-14).reverse()) {
+        const row = document.createElement('tr');
+        const values = [
+          day.date,
+          formatEnergy(day.energyJ),
+          formatDurationSeconds(day.coverageS),
+          day.complete ? 'Complete coverage' : 'Partial day'
+        ];
+        for (const value of values) {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.append(cell);
+        }
+        fragment.append(row);
+      }
+      ui.dailyEnergyBody.append(fragment);
+    }
+
+    function renderAnalytics() {
+      const result = computeNetStoragePower(
+        historyRecords,
+        analyticsSettings.capacitanceF,
+        analyticsSettings.regressionWindowMinutes
+      );
+      const hasVstorRecords = result.sourceSampleCount > 0;
+      const latestPoint = result.points.at(-1);
+      ui.latestNetPower.textContent = latestPoint ? `${latestPoint.powerUw.toFixed(1)} µW` : '—';
+      ui.validPowerCount.textContent = result.points.length.toLocaleString();
+      ui.medianSpacing.textContent = Number.isFinite(result.spacingS)
+        ? formatDurationSeconds(result.spacingS)
+        : '—';
+
+      if (currentConfigId === 3) {
+        ui.powerAvailability.textContent = hasVstorRecords
+          ? 'USB is present now, so current VSTOR is deliberately invalid. Historical VSTOR-valid records remain eligible.'
+          : 'USB is present, so firmware deliberately marks VSTOR invalid and storage-power analysis is unavailable.';
+      } else if (currentConfigId === 0 && !hasVstorRecords) {
+        ui.powerAvailability.textContent =
+          'Legacy/unknown records remain usable for LIVE, history, tables, and CSV, but no record explicitly carries the VSTOR-valid flag.';
+      } else if (!hasVstorRecords) {
+        ui.powerAvailability.textContent = historyRecords.length === 0
+          ? 'Sync timestamped history to calculate storage-plane power.'
+          : 'No timestamped record has a valid VSTOR value. Invalid or VDD readings are excluded.';
+      } else if (result.points.length === 0) {
+        ui.powerAvailability.textContent =
+          'Valid VSTOR samples exist, but each regression needs at least six points without a gap above three times the measured median spacing.';
+      } else {
+        ui.powerAvailability.textContent =
+          `Net storage power uses ${analyticsSettings.capacitanceF} F and a trailing ` +
+          `${formatDurationSeconds(result.windowSeconds)} centered least-squares voltage slope. Buck efficiency is not part of this storage-plane balance.`;
+      }
+
+      if (!powerChart && !harvestChart) initPowerCharts();
+      if (powerChart) {
+        powerChart.data.datasets[0].data = result.points.map((point) => ({
+          x: point.epochTs * 1000,
+          y: Number(point.powerUw.toFixed(1))
+        }));
+        powerChart.update('none');
+        ui.powerChartFallback.classList.toggle('visible', result.points.length === 0);
+      }
+
+      const inference = estimateDarkBaseline(
+        result.points,
+        analyticsSettings.regressionWindowMinutes,
+        DARK_THRESHOLDS_LUX
+      );
+      renderCandidateCards(inference);
+      const accepted = inference.acceptedIndex === null
+        ? null
+        : inference.candidates[inference.acceptedIndex];
+      ui.estimatedDrain.textContent = Number.isFinite(inference.baselineUw)
+        ? `${inference.baselineUw.toFixed(1)} µW`
+        : '—';
+      ui.acceptedBand.textContent = accepted ? `< ${accepted.thresholdLux} lux` : '—';
+      ui.inferenceConfidence.textContent = accepted
+        ? `${inference.confidence} · ${accepted.sampleCount} / ${formatDurationSeconds(accepted.coveredDurationS)}`
+        : 'Unavailable';
+
+      if (accepted) {
+        ui.inferenceSummary.textContent =
+          `Experimental estimate: adjacent low-light bands agree, so < ${accepted.thresholdLux} lux supplies the constant-drain baseline. ` +
+          `Estimated harvest is max(0, net storage power + ${inference.baselineUw.toFixed(1)} µW). ` +
+          'This assumes storage-plane drain is approximately constant.';
+      } else {
+        ui.inferenceSummary.textContent =
+          'Insufficient uncontaminated dark data. At least two adjacent <1/<3/<5 lux candidates must each have 30 estimates, span a full regression window, and agree within max(5 µW, 20%). No zero baseline is substituted.';
+        if (inference.rejectionReason) {
+          ui.inferenceSummary.textContent +=
+            ` ${inference.rejectionReason} Non-positive drain is rejected because it cannot support the constant-drain model.`;
+        }
+      }
+
+      const harvestPoints = estimateHarvestPoints(result.points, inference.baselineUw);
+      const latestHarvest = harvestPoints.at(-1);
+      ui.latestEstimatedHarvest.textContent = latestHarvest
+        ? `${latestHarvest.powerUw.toFixed(1)} µW`
+        : '—';
+      const slope = fitHarvestLuxSlope(harvestPoints);
+      ui.harvestLuxSlope.textContent = Number.isFinite(slope) ? `${slope.toFixed(3)} µW/lux` : '—';
+      if (harvestChart) {
+        harvestChart.data.datasets[0].data = harvestPoints.map((point) => ({
+          x: point.epochTs * 1000,
+          y: Number(point.powerUw.toFixed(1))
+        }));
+        harvestChart.update('none');
+        ui.harvestChartFallback.classList.toggle('visible', harvestPoints.length === 0);
+      }
+      renderDailyEnergy(integrateDailyEnergy(harvestPoints));
+    }
+
     function detectBluetoothSupport() {
       if (!window.isSecureContext) {
         ui.featureNotice.textContent = 'Web Bluetooth requires HTTPS, such as GitHub Pages, or a localhost development URL. A plain HTTP LAN address is not secure.';
@@ -1350,6 +2963,21 @@
     ui.disconnectButton.addEventListener('click', disconnect);
     ui.syncButton.addEventListener('click', syncHistory);
     ui.exportButton.addEventListener('click', exportCsv);
+    ui.capacitanceInput.addEventListener('change', updateAnalyticsSettings);
+    ui.regressionWindowInput.addEventListener('change', updateAnalyticsSettings);
+
+    ui.capacitanceInput.value = String(analyticsSettings.capacitanceF);
+    ui.regressionWindowInput.value = String(analyticsSettings.regressionWindowMinutes);
+
+    // Console-callable pure checks for protocol math development and release QA.
+    window.protocolSelfTest = protocolSelfTest;
+    window.powerMathSelfTest = powerMathSelfTest;
+    window.inferenceMathSelfTest = inferenceMathSelfTest;
+    window.tempBridgeSelfTest = () => Object.freeze({
+      protocol: protocolSelfTest(),
+      power: powerMathSelfTest(),
+      inference: inferenceMathSelfTest()
+    });
 
     initChart();
     renderHistory();
