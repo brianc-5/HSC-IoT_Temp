@@ -4,10 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1a">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Web Bluetooth client for the Protocol v3 TempBridge: live samples, retained history, CSV export, and harvested-power analysis.">
   <title>TempBridge</title>
 
   <!-- Production hosting: GitHub Pages or another HTTPS static host. -->
   <!-- Local fallback: python3 -m http.server 8000, optionally with adb reverse tcp:8000 tcp:8000. -->
+
+  <!-- Chart.js loads same-origin first (offline-capable, no third-party
+       handshake). Only if that file is absent does the SRI-pinned CDN copy
+       load, so preconnecting early hides its DNS/TLS cost in that case. -->
+  <link rel="preload" href="chart.umd.js" as="script">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
   <style>
     :root {
@@ -177,6 +185,9 @@
       border-radius: 18px;
       background: linear-gradient(145deg, rgb(21 31 49 / 0.96), rgb(12 19 31 / 0.96));
       box-shadow: var(--shadow);
+      /* Each card already clips its own content, so scoping layout/paint work
+         to the card keeps a table or chart rebuild off the rest of the page. */
+      contain: layout paint style;
     }
 
     .live-card {
@@ -597,6 +608,12 @@
     .table-card {
       margin-top: 18px;
       padding: 22px 0 0;
+      /* The 50-row record table is always below the fold. Skipping its layout
+         and paint until it scrolls into view removes it from the critical
+         path of every history refresh. It holds no canvas, so Chart.js sizing
+         is unaffected. */
+      content-visibility: auto;
+      contain-intrinsic-size: auto 620px;
     }
 
     .table-card .section-heading {
@@ -920,7 +937,26 @@
     </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- Same-origin copy first: no cross-origin DNS/TCP/TLS round trip, usable
+       with no internet in the field, and nothing is disclosed to a third
+       party. If index.html was deployed on its own, fall back to the pinned
+       CDN build; the app initialises charts lazily, so a late arrival is
+       handled by onChartLibraryReady() below rather than blocking the parser. -->
+  <script src="chart.umd.js"></script>
+  <script>
+    if (typeof Chart === 'undefined') {
+      var chartFallback = document.createElement('script');
+      chartFallback.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js';
+      chartFallback.integrity =
+        'sha384-zYPBGXwO4633CABX/5Spf6emCKUJCfoOkhOMYyxMsatqQZPnDblmmOewfjsIVWCM';
+      chartFallback.crossOrigin = 'anonymous';
+      chartFallback.referrerPolicy = 'no-referrer';
+      chartFallback.onload = function () {
+        if (typeof window.onChartLibraryReady === 'function') window.onChartLibraryReady();
+      };
+      document.head.appendChild(chartFallback);
+    }
+  </script>
   <script>
     'use strict';
 
@@ -1106,12 +1142,185 @@
     };
     let chartDrag = null;
 
+    // ---- Render scheduling -------------------------------------------------
+    // Panning, scrubbing and a wheel gesture can each request many redraws per
+    // frame, and a LIVE sample used to rebuild the table, both charts, the
+    // capability flags and the whole power pipeline synchronously. Requests are
+    // collected into a bitmask and flushed once per animation frame instead, so
+    // a burst of pointer events costs one redraw rather than one per event.
+    const RENDER_CHART = 1;
+    const RENDER_RAW_CHART = 2;
+    const RENDER_TABLE = 4;
+    const RENDER_CAPABILITIES = 8;
+    const RENDER_ANALYTICS = 16;
+    const RENDER_EVERYTHING =
+      RENDER_CHART | RENDER_RAW_CHART | RENDER_TABLE |
+      RENDER_CAPABILITIES | RENDER_ANALYTICS;
+
+    let pendingRenderFlags = 0;
+    let renderFrameHandle = 0;
+
+    // historyRecords is immutable between assignments, so one counter is enough
+    // to invalidate every derived cache below.
+    let historyVersion = 0;
+    let historySummaryCache = null;
+    let historySpacingCache = null;
+    let rawSeriesCache = null;
+    let analyticsCache = null;
+
+    function scheduleRender(flags) {
+      pendingRenderFlags |= flags;
+      if (renderFrameHandle !== 0) return;
+      renderFrameHandle = window.requestAnimationFrame(flushScheduledRender);
+    }
+
+    function flushScheduledRender() {
+      renderFrameHandle = 0;
+      const flags = pendingRenderFlags;
+      pendingRenderFlags = 0;
+      if (flags === 0) return;
+
+      // Capabilities decide which sections are visible, so they run first and
+      // let the chart/analytics passes skip work for hidden sections.
+      if ((flags & RENDER_CAPABILITIES) !== 0) renderCapabilities();
+      if ((flags & RENDER_TABLE) !== 0) renderRecentRecordsTable();
+      if ((flags & RENDER_CHART) !== 0) renderChart();
+      if ((flags & RENDER_RAW_CHART) !== 0) renderRawStorageChart();
+      if ((flags & RENDER_ANALYTICS) !== 0) renderAnalytics();
+      updateButtonStates();
+    }
+
+    // Forces any pending frame to run now. Used by the console self-tests and
+    // by CSV export so they never observe a half-applied render.
+    function flushRenderNow() {
+      if (renderFrameHandle !== 0) {
+        window.cancelAnimationFrame(renderFrameHandle);
+        renderFrameHandle = 0;
+      }
+      flushScheduledRender();
+    }
+
+    // ---- Cached derivations over historyRecords ----------------------------
+    // renderCapabilities, renderChart, renderAnalytics and the sync boundary
+    // each used to walk all 4,096 records separately. One pass now answers all
+    // of them and is reused until historyRecords is replaced.
+    function historySummary() {
+      if (historySummaryCache !== null &&
+          historySummaryCache.version === historyVersion) {
+        return historySummaryCache;
+      }
+
+      let hasVstor = false;
+      let hasHatFields = false;
+      let earliestMs = null;
+      let latestMs = null;
+      let newestEpoch = 0;
+      let firstTimestampedIndex = -1;
+      let lastTimestampedIndex = -1;
+
+      for (let index = 0; index < historyRecords.length; index += 1) {
+        const record = historyRecords[index];
+        if (record.vstorValid) hasVstor = true;
+        if (!hasHatFields && (record.ambientTemperature ||
+            record.humidityPct !== null || record.lux !== null ||
+            record.vstorValid)) {
+          hasHatFields = true;
+        }
+        const epochTs = record.epochTs;
+        if (epochTs > newestEpoch) newestEpoch = epochTs;
+        const timestampMs = epochTs * 1000;
+        if (Number.isFinite(timestampMs) && timestampMs > 0) {
+          if (earliestMs === null || timestampMs < earliestMs) earliestMs = timestampMs;
+          if (latestMs === null || timestampMs > latestMs) latestMs = timestampMs;
+          if (firstTimestampedIndex < 0) firstTimestampedIndex = index;
+          lastTimestampedIndex = index;
+        }
+      }
+
+      historySummaryCache = Object.freeze({
+        version: historyVersion,
+        hasVstor,
+        hasHatFields,
+        newestEpoch,
+        firstTimestampedIndex,
+        lastTimestampedIndex,
+        bounds: earliestMs === null ? null : Object.freeze({ earliestMs, latestMs })
+      });
+      return historySummaryCache;
+    }
+
+    function historyMedianSpacingMs() {
+      if (historySpacingCache !== null &&
+          historySpacingCache.version === historyVersion) {
+        return historySpacingCache.spacingMs;
+      }
+      const spacingMs = medianTimestampSpacingMs(historyRecords);
+      historySpacingCache = { version: historyVersion, spacingMs };
+      return spacingMs;
+    }
+
+    // historyRecords is sorted by (epochTs, seq), so the visible slice of a
+    // chart window is a contiguous range that binary search finds in O(log n)
+    // instead of filtering every record on every pan frame.
+    function firstIndexAtOrAfterMs(records, timestampMs) {
+      let low = 0;
+      let high = records.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (records[middle].epochTs * 1000 < timestampMs) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+      return low;
+    }
+
+    function firstIndexAfterMs(records, timestampMs) {
+      let low = 0;
+      let high = records.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (records[middle].epochTs * 1000 <= timestampMs) {
+          low = middle + 1;
+        } else {
+          high = middle;
+        }
+      }
+      return low;
+    }
+
+    // Cached Intl formatters. toLocaleString()/toLocaleTimeString() build a new
+    // formatter on every call, and axis ticks and tooltips call them per point.
     const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
       month: 'short',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit'
+    });
+
+    const clockFormatter = new Intl.DateTimeFormat([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const dayClockFormatter = new Intl.DateTimeFormat([], {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // These options are exactly what Date.prototype.toLocaleString() applies
+    // when it is called without any, so tooltip text is unchanged.
+    const tooltipFormatter = new Intl.DateTimeFormat([], {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric'
     });
 
     function asDataView(value) {
@@ -1453,8 +1662,9 @@
       ui.statusRetention.textContent = currentSampleIntervalMs > 0
         ? formatDurationSeconds((BRIDGE_RECORD_CAPACITY * currentSampleIntervalMs) / 1000)
         : 'Unknown';
-      renderCapabilities();
-      if (previousConfigId !== currentConfigId) renderAnalytics();
+      scheduleRender(previousConfigId !== currentConfigId
+        ? RENDER_CAPABILITIES | RENDER_ANALYTICS
+        : RENDER_CAPABILITIES);
     }
 
     function formatRecordTime(epochTs) {
@@ -1489,7 +1699,8 @@
         ? ` · sampled ${new Date(record.epochTs * 1000).toLocaleTimeString()}`
         : ' · timestamp unsynced';
       ui.liveCaption.textContent = `${source === 'read' ? 'Read' : 'Arrived'} at ${arrival}${sampleTime}`;
-      renderCapabilities();
+      // updateConfigurationDisplay above already scheduled RENDER_CAPABILITIES
+      // for this same live record; a second synchronous pass was redundant.
     }
 
     function unsyncedRecordIdentity(record) {
@@ -1527,6 +1738,7 @@
         if (a.epochTs !== b.epochTs) return a.epochTs - b.epochTs;
         return a.seq - b.seq;
       });
+      historyVersion += 1;
     }
 
     function mergeRecords(records) {
@@ -1534,9 +1746,23 @@
       sortHistoryRecords();
     }
 
+    // A completed sync merges the transfer map, the LIVE map and the current
+    // LIVE record. Sorting once at the end instead of after each source keeps
+    // one O(n log n) pass rather than three.
+    function mergeRecordSources(...sources) {
+      for (const source of sources) {
+        if (!source) continue;
+        for (const record of source) {
+          mergeRecordIntoStore(recordsByIdentity, record);
+        }
+      }
+      sortHistoryRecords();
+    }
+
     function resetHeldHistory(message) {
       recordsByIdentity.clear();
       historyRecords = [];
+      historyVersion += 1;
       historyInitialized = false;
       latestLiveRecord = null;
       lastBridgeRecordCount = null;
@@ -1553,62 +1779,123 @@
       renderHistory();
     }
 
-    function renderHistory() {
+    const RECENT_RECORD_ROWS = 50;
+    const RECENT_TABLE_COLUMNS = 8;
+    const HAT_TABLE_COLUMNS = Object.freeze([5, 6]);
+
+    // Rows and cells are created once and then rewritten in place. Rebuilding
+    // 50 rows x 8 cells from scratch on every LIVE sample was the largest
+    // recurring DOM allocation in the app.
+    const recentRowPool = [];
+    let recentRowsAttached = 0;
+    let emptyHistoryRow = null;
+    let hatColumnsVisible = false;
+
+    function recentRowAt(index) {
+      let entry = recentRowPool[index];
+      if (entry !== undefined) return entry;
+
+      const row = document.createElement('tr');
+      const cells = [];
+      for (let column = 0; column < RECENT_TABLE_COLUMNS; column += 1) {
+        const cell = document.createElement('td');
+        if (HAT_TABLE_COLUMNS.includes(column)) {
+          cell.className = 'hat-column';
+          cell.hidden = !hatColumnsVisible;
+        }
+        row.append(cell);
+        cells.push(cell);
+      }
+      entry = { row, cells };
+      recentRowPool[index] = entry;
+      return entry;
+    }
+
+    function applyHatColumnVisibility(visible) {
+      hatColumnsVisible = visible;
+      for (const element of ui.hatColumns) element.hidden = !visible;
+      for (const entry of recentRowPool) {
+        for (const column of HAT_TABLE_COLUMNS) entry.cells[column].hidden = !visible;
+      }
+    }
+
+    function setCellText(cell, text) {
+      // Skipping an unchanged assignment avoids needless style/layout
+      // invalidation on the rows that did not move.
+      if (cell.textContent !== text) cell.textContent = text;
+    }
+
+    function renderRecentRecordsTable() {
       const total = historyRecords.length;
       ui.recordCount.textContent = `${total.toLocaleString()} ${total === 1 ? 'record' : 'records'} held`;
 
-      const recent = historyRecords.slice(-50).reverse();
-      ui.historyBody.replaceChildren();
-
-      if (recent.length === 0) {
-        const row = document.createElement('tr');
-        row.className = 'empty-row';
-        const cell = document.createElement('td');
-        cell.colSpan = 8;
-        cell.textContent = 'No history loaded.';
-        row.append(cell);
-        ui.historyBody.append(row);
-      } else {
-        const fragment = document.createDocumentFragment();
-        for (const record of recent) {
-          const row = document.createElement('tr');
-          const values = [
-            formatRecordTime(record.epochTs),
-            record.seq.toString(),
-            configurationFor(record.configId).short,
-            record.tempC === null ? '—' : `${record.tempC.toFixed(2)} °C ${recordTemperatureSource(record)}`,
-            record.voltageV === null ? `— ${recordVoltageKind(record)}` : `${record.voltageV.toFixed(3)} V ${recordVoltageKind(record)}`,
-            record.lux === null ? '—' : `${record.lux} lux`,
-            record.humidityPct === null ? '—' : `${record.humidityPct.toFixed(2)} %RH`,
-            `${record.rssi} dBm`
-          ];
-          values.forEach((value, index) => {
+      if (total === 0) {
+        if (recentRowsAttached !== 0 || emptyHistoryRow === null) {
+          if (emptyHistoryRow === null) {
+            const row = document.createElement('tr');
+            row.className = 'empty-row';
             const cell = document.createElement('td');
-            if (index === 5 || index === 6) cell.className = 'hat-column';
-            cell.textContent = value;
+            cell.colSpan = RECENT_TABLE_COLUMNS;
+            cell.textContent = 'No history loaded.';
             row.append(cell);
-          });
-          fragment.append(row);
+            emptyHistoryRow = row;
+          }
+          ui.historyBody.replaceChildren(emptyHistoryRow);
+          recentRowsAttached = 0;
         }
-        ui.historyBody.append(fragment);
+        return;
       }
 
-      renderChart();
-      renderRawStorageChart();
-      renderCapabilities();
-      renderAnalytics();
-      updateButtonStates();
+      const visibleRows = Math.min(RECENT_RECORD_ROWS, total);
+      for (let offset = 0; offset < visibleRows; offset += 1) {
+        // Newest first, without allocating a reversed 50-record slice.
+        const record = historyRecords[total - 1 - offset];
+        const { cells } = recentRowAt(offset);
+        const voltageKind = recordVoltageKind(record);
+        setCellText(cells[0], formatRecordTime(record.epochTs));
+        setCellText(cells[1], record.seq.toString());
+        setCellText(cells[2], configurationFor(record.configId).short);
+        setCellText(cells[3], record.tempC === null
+          ? '—'
+          : `${record.tempC.toFixed(2)} °C ${recordTemperatureSource(record)}`);
+        setCellText(cells[4], record.voltageV === null
+          ? `— ${voltageKind}`
+          : `${record.voltageV.toFixed(3)} V ${voltageKind}`);
+        setCellText(cells[5], record.lux === null ? '—' : `${record.lux} lux`);
+        setCellText(cells[6], record.humidityPct === null
+          ? '—'
+          : `${record.humidityPct.toFixed(2)} %RH`);
+        setCellText(cells[7], `${record.rssi} dBm`);
+      }
+
+      // Only touch the DOM tree when the number of attached rows changed.
+      if (recentRowsAttached !== visibleRows) {
+        const rows = [];
+        for (let offset = 0; offset < visibleRows; offset += 1) {
+          rows.push(recentRowPool[offset].row);
+        }
+        ui.historyBody.replaceChildren(...rows);
+        recentRowsAttached = visibleRows;
+      }
     }
 
+    function renderHistory() {
+      scheduleRender(RENDER_EVERYTHING);
+    }
+
+    // Single pass with running min/max: no intermediate arrays and no
+    // Math.min(...spread), whose argument count is bounded by the call stack.
     function timestampedHistoryBounds(records = historyRecords) {
-      const timestamps = records
-        .map((record) => record.epochTs * 1000)
-        .filter((timestamp) => Number.isFinite(timestamp) && timestamp > 0);
-      if (timestamps.length === 0) return null;
-      return {
-        earliestMs: Math.min(...timestamps),
-        latestMs: Math.max(...timestamps)
-      };
+      let earliestMs = null;
+      let latestMs = null;
+      for (let index = 0; index < records.length; index += 1) {
+        const timestamp = records[index].epochTs * 1000;
+        if (!Number.isFinite(timestamp) || timestamp <= 0) continue;
+        if (earliestMs === null || timestamp < earliestMs) earliestMs = timestamp;
+        if (latestMs === null || timestamp > latestMs) latestMs = timestamp;
+      }
+      if (earliestMs === null) return null;
+      return { earliestMs, latestMs };
     }
 
     function resolveChartViewport(bounds, durationMs, requestedEndMs, followingLatest) {
@@ -1646,11 +1933,22 @@
       };
     }
 
+    // Collects timestamps in one pass and sorts them only when the input is not
+    // already ascending, which it always is for the sorted history array.
     function medianTimestampSpacingMs(records = historyRecords) {
-      const timestamps = records
-        .filter((record) => record.epochTs > 0)
-        .map((record) => record.epochTs * 1000)
-        .sort((a, b) => a - b);
+      const timestamps = [];
+      let ascending = true;
+      for (let index = 0; index < records.length; index += 1) {
+        const record = records[index];
+        if (record.epochTs <= 0) continue;
+        const timestamp = record.epochTs * 1000;
+        if (timestamps.length !== 0 && timestamp < timestamps[timestamps.length - 1]) {
+          ascending = false;
+        }
+        timestamps.push(timestamp);
+      }
+      if (!ascending) timestamps.sort((a, b) => a - b);
+
       const gaps = [];
       for (let index = 1; index < timestamps.length; index += 1) {
         const gap = timestamps[index] - timestamps[index - 1];
@@ -1664,21 +1962,25 @@
         : gaps[middle];
     }
 
-    function buildVisibleSeries(records, viewport, valueForRecord, gapThresholdMs) {
+    // startIndex/endIndex let a caller that already knows the visible slice skip
+    // the records outside it. Omitting them scans everything, exactly as before.
+    // One pass replaces map -> filter -> sort over the full history, and the
+    // value callback now runs only for records inside the window.
+    function buildVisibleSeries(records, viewport, valueForRecord, gapThresholdMs,
+                                startIndex = 0, endIndex = records.length) {
       if (!viewport) return [];
-      const points = records
-        .map((record) => ({
-          x: record.epochTs * 1000,
-          y: valueForRecord(record)
-        }))
-        .filter((point) =>
-          point.x > 0 &&
-          point.x >= viewport.startMs &&
-          point.x <= viewport.endMs &&
-          point.y !== null &&
-          Number.isFinite(point.y)
-        )
-        .sort((a, b) => a.x - b.x);
+      const points = [];
+      let ascending = true;
+      for (let index = startIndex; index < endIndex; index += 1) {
+        const record = records[index];
+        const x = record.epochTs * 1000;
+        if (!(x > 0) || x < viewport.startMs || x > viewport.endMs) continue;
+        const y = valueForRecord(record);
+        if (y === null || !Number.isFinite(y)) continue;
+        if (points.length !== 0 && x < points[points.length - 1].x) ascending = false;
+        points.push({ x, y });
+      }
+      if (!ascending) points.sort((a, b) => a.x - b.x);
       if (points.length < 2) return points;
 
       const withGaps = [points[0]];
@@ -1695,21 +1997,12 @@
 
     function formatChartRange(viewport) {
       if (!viewport) return 'No timestamped measurements';
-      const options = {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      };
-      return `${new Date(viewport.startMs).toLocaleString([], options)} – ${new Date(viewport.endMs).toLocaleString([], options)}`;
+      return `${dayClockFormatter.format(viewport.startMs)} – ${dayClockFormatter.format(viewport.endMs)}`;
     }
 
     function formatChartTick(value) {
-      const date = new Date(Number(value));
       const includeDate = chartView.durationMs === 0 || chartView.durationMs >= 12 * 60 * 60 * 1000;
-      return date.toLocaleString([], includeDate
-        ? { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
-        : { hour: '2-digit', minute: '2-digit' });
+      return (includeDate ? dayClockFormatter : clockFormatter).format(Number(value));
     }
 
     function updateChartNavigation(viewport) {
@@ -1728,13 +2021,16 @@
       chartView.durationMs = durationMs;
       chartView.endMs = null;
       chartView.followingLatest = true;
-      renderChart();
+      scheduleRender(RENDER_CHART);
     }
 
+    // Called once per pointermove, per wheel notch and per scrubber input event.
+    // Coalescing to one redraw per animation frame is what keeps a drag smooth
+    // on a phone with a full 4,096-record buffer.
     function setChartEnd(endMs) {
       chartView.endMs = endMs;
       chartView.followingLatest = false;
-      renderChart();
+      scheduleRender(RENDER_CHART);
     }
 
     function panChart(fraction) {
@@ -1875,7 +2171,7 @@
                 title(items) {
                   if (items.length === 0) return '';
                   const epochMs = items[0].parsed.x;
-                  return epochMs === 0 ? 'Unsynced timestamp' : new Date(epochMs).toLocaleString();
+                  return epochMs === 0 ? 'Unsynced timestamp' : tooltipFormatter.format(epochMs);
                 }
               }
             }
@@ -1931,7 +2227,8 @@
         }
       }
 
-      const bounds = timestampedHistoryBounds();
+      const summary = historySummary();
+      const bounds = summary.bounds;
       const viewport = resolveChartViewport(
         bounds,
         chartView.durationMs,
@@ -1942,37 +2239,52 @@
         chartView.endMs = viewport.endMs;
         chartView.followingLatest = viewport.endMs >= viewport.latestMs;
       }
-      const measuredSpacingMs = medianTimestampSpacingMs();
-      const nominalSpacingMs = currentSampleIntervalMs > 0 ? currentSampleIntervalMs : measuredSpacingMs;
+      // The measured median is only consulted when the bridge did not report a
+      // cadence, and it is memoized per history version either way.
+      const nominalSpacingMs = currentSampleIntervalMs > 0
+        ? currentSampleIntervalMs
+        : historyMedianSpacingMs();
       const gapThresholdMs = Math.max(
         CHART_GAP_MINIMUM_MS,
         Number.isFinite(nominalSpacingMs) ? nominalSpacingMs * 3.5 : CHART_GAP_MINIMUM_MS
       );
+
+      // historyRecords is sorted, so the window is one contiguous slice. Two
+      // binary searches replace three full-history scans plus a fourth pass
+      // that counted the visible records.
+      const visibleStart = viewport ? firstIndexAtOrAfterMs(historyRecords, viewport.startMs) : 0;
+      const visibleEnd = viewport ? firstIndexAfterMs(historyRecords, viewport.endMs) : 0;
+      const visibleRecordCount = Math.max(0, visibleEnd - visibleStart);
+
       const temperatureData = buildVisibleSeries(
         historyRecords,
         viewport,
         (record) => record.tempC,
-        gapThresholdMs
+        gapThresholdMs,
+        visibleStart,
+        visibleEnd
       );
       const vddData = buildVisibleSeries(
         historyRecords,
         viewport,
         (record) => recordVoltageKind(record) === 'VDD' ? record.voltageV : null,
-        gapThresholdMs
+        gapThresholdMs,
+        visibleStart,
+        visibleEnd
       );
-      const humidityData = buildVisibleSeries(
-        historyRecords,
-        viewport,
-        (record) => record.humidityPct,
-        gapThresholdMs
-      );
+      // No held record carries any HAT field, so the humidity series is
+      // necessarily empty; skip the pass instead of proving it again.
+      const humidityData = summary.hasHatFields
+        ? buildVisibleSeries(
+            historyRecords,
+            viewport,
+            (record) => record.humidityPct,
+            gapThresholdMs,
+            visibleStart,
+            visibleEnd
+          )
+        : [];
       const chartPointCount = temperatureData.length + vddData.length + humidityData.length;
-      const visibleRecordCount = viewport
-        ? historyRecords.filter((record) => {
-            const timestamp = record.epochTs * 1000;
-            return timestamp >= viewport.startMs && timestamp <= viewport.endMs;
-          }).length
-        : 0;
 
       ui.chartFallback.classList.toggle('visible', chartPointCount === 0);
       ui.chartFallback.textContent = historyRecords.length === 0
@@ -2042,18 +2354,36 @@
       });
     }
 
+    let rawChartRenderedVersion = -1;
+
     function renderRawStorageChart() {
+      // The section is hidden for every bare configuration. renderCapabilities
+      // reschedules this pass when it unhides the section.
+      if (ui.rawStorageSection.hidden) return;
       if (!rawStorageChart) {
         initRawStorageChart();
         if (!rawStorageChart) return;
       }
+      if (rawChartRenderedVersion === historyVersion) return;
 
-      const vstorData = historyRecords
-        .filter((record) => record.epochTs > 0 && record.vstorValid && record.voltageV !== null)
-        .map((record) => ({ x: record.epochTs * 1000, y: record.voltageV }));
-      const luxData = historyRecords
-        .filter((record) => record.epochTs > 0 && record.lux !== null)
-        .map((record) => ({ x: record.epochTs * 1000, y: record.lux }));
+      // Both series come from one pass instead of two filter+map pairs, and the
+      // result is reused if the chart is redrawn without new records.
+      if (rawSeriesCache === null || rawSeriesCache.version !== historyVersion) {
+        const vstorData = [];
+        const luxData = [];
+        for (let index = 0; index < historyRecords.length; index += 1) {
+          const record = historyRecords[index];
+          if (record.epochTs <= 0) continue;
+          const x = record.epochTs * 1000;
+          if (record.vstorValid && record.voltageV !== null) {
+            vstorData.push({ x, y: record.voltageV });
+          }
+          if (record.lux !== null) luxData.push({ x, y: record.lux });
+        }
+        rawSeriesCache = { version: historyVersion, vstorData, luxData };
+      }
+
+      const { vstorData, luxData } = rawSeriesCache;
       rawStorageChart.data.datasets[0].data = vstorData;
       rawStorageChart.data.datasets[1].data = luxData;
       const empty = vstorData.length === 0 && luxData.length === 0;
@@ -2062,6 +2392,7 @@
         ? 'Sync history to populate the chart.'
         : 'No timestamped VSTOR-valid or illuminance samples are available.';
       rawStorageChart.update('none');
+      rawChartRenderedVersion = historyVersion;
     }
 
     function linearAxis(position, title, drawGrid, extra = {}) {
@@ -2092,7 +2423,7 @@
             callbacks: {
               title(items) {
                 if (items.length === 0) return '';
-                return new Date(items[0].parsed.x).toLocaleString();
+                return tooltipFormatter.format(items[0].parsed.x);
               }
             }
           }
@@ -2106,7 +2437,7 @@
               color: '#94a3b8',
               maxRotation: 0,
               callback(value) {
-                return new Date(Number(value)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                return clockFormatter.format(Number(value));
               }
             }
           },
@@ -2117,11 +2448,12 @@
 
     function renderCapabilities() {
       const config = configurationFor(currentConfigId);
-      const hasVstorHistory = historyRecords.some((record) => record.vstorValid);
+      // Two memoized booleans replace two full-history .some() scans that ran
+      // on every render, including every pan frame.
+      const summary = historySummary();
+      const hasVstorHistory = summary.hasVstor;
       const liveHasVstor = Boolean(latestLiveRecord && latestLiveRecord.vstorValid);
-      const hasHatHistory = historyRecords.some((record) =>
-        record.ambientTemperature || record.humidityPct !== null || record.lux !== null || record.vstorValid
-      );
+      const hasHatHistory = summary.hasHatFields;
       const liveHasHatFields = Boolean(latestLiveRecord && (
         latestLiveRecord.ambientTemperature ||
         latestLiveRecord.humidityPct !== null ||
@@ -2130,14 +2462,25 @@
       ));
       const showHat = config.hat || (!config.bare && (hasHatHistory || liveHasHatFields));
       for (const element of ui.hatFields) element.hidden = !showHat;
-      for (const element of document.querySelectorAll('.hat-column')) element.hidden = !showHat;
+      // The cached header cells and the pooled table cells, rather than a fresh
+      // document.querySelectorAll('.hat-column') on every call.
+      if (hatColumnsVisible !== showHat) applyHatColumnVisibility(showHat);
 
+      const rawWasHidden = ui.rawStorageSection.hidden;
+      const powerWasHidden = ui.powerSection.hidden;
       ui.rawStorageSection.hidden = config.bare || !showHat;
       const hasPowerCapability = config.hat || hasVstorHistory || liveHasVstor;
       ui.powerSection.hidden =
         config.bare ||
         (!latestStatus && !latestLiveRecord) ||
         !hasPowerCapability;
+
+      // A section that just became visible needs the pass it was skipping.
+      let revealed = 0;
+      if (rawWasHidden && !ui.rawStorageSection.hidden) revealed |= RENDER_RAW_CHART;
+      if (powerWasHidden && !ui.powerSection.hidden) revealed |= RENDER_ANALYTICS;
+      if (revealed !== 0) scheduleRender(revealed);
+
       ui.chartTitle.textContent = showHat
         ? 'Temperature and humidity history'
         : 'Temperature and VDD history';
@@ -2478,10 +2821,10 @@
       }
     }
 
+    // Taken from the memoized history summary rather than re-scanning all
+    // 4,096 records each time a sync boundary is computed.
     function newestHeldEpoch() {
-      let newest = 0;
-      for (const record of historyRecords) newest = Math.max(newest, record.epochTs);
-      return newest;
+      return historySummary().newestEpoch;
     }
 
     async function syncHistory() {
@@ -2525,14 +2868,16 @@
         if (!sync.settled) resetSyncWatchdog(sync);
         await completion;
 
-        mergeRecords(sync.recordsByIdentity.values());
-        mergeRecords(sync.liveRecordsByIdentity.values());
-        historyInitialized = true;
-
         // Include the current LIVE value after the first full sync; this never
         // influences the initial since_epoch boundary and covers a sample that
-        // arrived while the history stream was in flight.
-        if (latestLiveRecord) mergeRecords([latestLiveRecord]);
+        // arrived while the history stream was in flight. All three sources are
+        // merged before a single re-sort instead of once per source.
+        mergeRecordSources(
+          sync.recordsByIdentity.values(),
+          sync.liveRecordsByIdentity.values(),
+          latestLiveRecord ? [latestLiveRecord] : null
+        );
+        historyInitialized = true;
 
         sync.committed = true;
         renderHistory();
@@ -2555,8 +2900,10 @@
           // LIVE can fire while the post-sync STATUS read is in flight. Merge
           // the transfer-side map once more before clearing activeSync so that
           // even that narrow window remains lossless.
-          mergeRecords(sync.liveRecordsByIdentity.values());
-          if (latestLiveRecord) mergeRecords([latestLiveRecord]);
+          mergeRecordSources(
+            sync.liveRecordsByIdentity.values(),
+            latestLiveRecord ? [latestLiveRecord] : null
+          );
           renderHistory();
           const changed = Math.max(0, recordsByIdentity.size - sync.heldBefore);
           ui.syncProgress.textContent = `Sync complete · ${sync.received.toLocaleString()} received · ${changed.toLocaleString()} new · ${historyRecords.length.toLocaleString()} total`;
@@ -2700,21 +3047,31 @@
       return median(spacings);
     }
 
-    function centeredLeastSquaresSlope(points) {
-      if (!Array.isArray(points) || points.length < 2) return null;
+    // startIndex/endIndex operate on a half-open range of an existing array so
+    // the caller does not have to materialize a slice per regression window.
+    // Both accumulation loops still visit the same points in the same ascending
+    // order, so the summation - and therefore the slope - is bit-identical to
+    // the previous slice-based form.
+    function centeredLeastSquaresSlope(points, startIndex = 0, endIndex = points.length) {
+      if (!Array.isArray(points)) return null;
+      const count = endIndex - startIndex;
+      if (count < 2) return null;
+
       let meanTime = 0;
       let meanVoltage = 0;
-      for (const point of points) {
+      for (let index = startIndex; index < endIndex; index += 1) {
+        const point = points[index];
         if (!Number.isFinite(point.epochTs) || !Number.isFinite(point.voltageV)) return null;
         meanTime += point.epochTs;
         meanVoltage += point.voltageV;
       }
-      meanTime /= points.length;
-      meanVoltage /= points.length;
+      meanTime /= count;
+      meanVoltage /= count;
 
       let numerator = 0;
       let denominator = 0;
-      for (const point of points) {
+      for (let index = startIndex; index < endIndex; index += 1) {
+        const point = points[index];
         const centeredTime = point.epochTs - meanTime;
         numerator += centeredTime * (point.voltageV - meanVoltage);
         denominator += centeredTime * centeredTime;
@@ -2724,23 +3081,38 @@
       return Number.isFinite(slope) ? slope : null;
     }
 
+    // One pass builds the projection directly, and the sort is skipped when the
+    // input is already ordered - which it is for historyRecords, since that
+    // array is kept sorted by exactly this (epochTs, seq) key.
     function selectValidVstorSamples(records) {
-      return records
-        .filter((record) =>
-          record &&
-          record.vstorValid === true &&
-          Number.isFinite(record.epochTs) &&
-          record.epochTs > 0 &&
-          Number.isFinite(record.voltageV) &&
-          record.voltageV > 0
-        )
-        .map((record) => ({
+      const samples = [];
+      let ordered = true;
+      for (let index = 0; index < records.length; index += 1) {
+        const record = records[index];
+        if (!record || record.vstorValid !== true ||
+            !Number.isFinite(record.epochTs) || record.epochTs <= 0 ||
+            !Number.isFinite(record.voltageV) || record.voltageV <= 0) {
+          continue;
+        }
+        const sample = {
           epochTs: record.epochTs,
           seq: record.seq,
           voltageV: record.voltageV,
           lux: Number.isFinite(record.lux) ? record.lux : null
-        }))
-        .sort((a, b) => a.epochTs - b.epochTs || (a.seq || 0) - (b.seq || 0));
+        };
+        if (samples.length !== 0) {
+          const previous = samples[samples.length - 1];
+          if ((sample.epochTs - previous.epochTs ||
+               (sample.seq || 0) - (previous.seq || 0)) < 0) {
+            ordered = false;
+          }
+        }
+        samples.push(sample);
+      }
+      if (!ordered) {
+        samples.sort((a, b) => a.epochTs - b.epochTs || (a.seq || 0) - (b.seq || 0));
+      }
+      return samples;
     }
 
     function computeNetStoragePower(records, capacitanceF, windowMinutes) {
@@ -2759,25 +3131,32 @@
         });
       }
 
+      // Index of the most recent oversized step at or before each sample. The
+      // trailing window [left, right] contains an oversized step exactly when
+      // that index is greater than left, which turns the former per-window
+      // O(window) rescan into one O(n) precomputation.
+      const gapLimitS = 3 * spacingS;
+      const latestGapAt = new Int32Array(samples.length);
+      let mostRecentGapIndex = -1;
+      for (let index = 0; index < samples.length; index += 1) {
+        if (index > 0) {
+          const gap = samples[index].epochTs - samples[index - 1].epochTs;
+          if (Number.isFinite(gap) && gap > gapLimitS) mostRecentGapIndex = index;
+        }
+        latestGapAt[index] = mostRecentGapIndex;
+      }
+
       const points = [];
       let left = 0;
       for (let right = 0; right < samples.length; right += 1) {
         const current = samples[right];
         while (left < right && samples[left].epochTs < current.epochTs - windowSeconds) left += 1;
-        const windowPoints = samples.slice(left, right + 1);
-        if (windowPoints.length < 6) continue;
+        const windowCount = right - left + 1;
+        if (windowCount < 6) continue;
+        if (latestGapAt[right] > left) continue;
 
-        let hasLargeGap = false;
-        for (let index = 1; index < windowPoints.length; index += 1) {
-          const gap = windowPoints[index].epochTs - windowPoints[index - 1].epochTs;
-          if (Number.isFinite(gap) && gap > 3 * spacingS) {
-            hasLargeGap = true;
-            break;
-          }
-        }
-        if (hasLargeGap) continue;
-
-        const slopeVPerS = centeredLeastSquaresSlope(windowPoints);
+        // Regress over the live array in place; no per-sample slice allocation.
+        const slopeVPerS = centeredLeastSquaresSlope(samples, left, right + 1);
         if (!Number.isFinite(slopeVPerS)) continue;
         const powerW = capacitance * current.voltageV * slopeVPerS;
         const powerUw = powerW * 1e6;
@@ -2790,8 +3169,8 @@
           slopeVPerS,
           powerW,
           powerUw,
-          regressionPointCount: windowPoints.length,
-          regressionSpanS: current.epochTs - windowPoints[0].epochTs
+          regressionPointCount: windowCount,
+          regressionSpanS: current.epochTs - samples[left].epochTs
         }));
       }
 
@@ -2803,11 +3182,27 @@
       });
     }
 
+    // Every producer of power points emits them in ascending epoch order, so
+    // the defensive sort is kept but only paid for when it is actually needed.
+    // Array sorting is stable, so re-sorting an ordered array is a no-op.
+    function finitePowerPointsByEpoch(points) {
+      const filtered = [];
+      for (let index = 0; index < points.length; index += 1) {
+        const point = points[index];
+        if (point && Number.isFinite(point.epochTs) && Number.isFinite(point.powerUw)) {
+          filtered.push(point);
+        }
+      }
+      for (let index = 1; index < filtered.length; index += 1) {
+        if (filtered[index].epochTs < filtered[index - 1].epochTs) {
+          return filtered.sort((a, b) => a.epochTs - b.epochTs);
+        }
+      }
+      return filtered;
+    }
+
     function integratePowerJ(points, maxGapS = null) {
-      const sorted = points
-        .filter((point) => point && Number.isFinite(point.epochTs) && Number.isFinite(point.powerUw))
-        .slice()
-        .sort((a, b) => a.epochTs - b.epochTs);
+      const sorted = finitePowerPointsByEpoch(points);
       const inferredSpacing = medianPositiveSpacingS(sorted);
       const allowedGap = Number.isFinite(maxGapS) && maxGapS > 0
         ? maxGapS
@@ -2863,17 +3258,12 @@
 
     function estimateDarkBaseline(powerPoints, windowMinutes, thresholds = [1, 3, 5]) {
       const windowSeconds = Number(windowMinutes) * 60;
+      // The epoch ordering and the finiteness checks are shared by all three
+      // bands, so they are done once instead of once per threshold.
+      const luxPoints = finitePowerPointsByEpoch(powerPoints)
+        .filter((point) => Number.isFinite(point.lux));
       const candidates = thresholds.map((thresholdLux) => {
-        const samples = powerPoints
-          .filter((point) =>
-            point &&
-            Number.isFinite(point.epochTs) &&
-            Number.isFinite(point.powerUw) &&
-            Number.isFinite(point.lux) &&
-            point.lux < thresholdLux
-          )
-          .slice()
-          .sort((a, b) => a.epochTs - b.epochTs);
+        const samples = luxPoints.filter((point) => point.lux < thresholdLux);
         const coveredDurationS = samples.length > 1
           ? samples[samples.length - 1].epochTs - samples[0].epochTs
           : 0;
@@ -2980,26 +3370,42 @@
       return Number.isFinite(slope) ? slope : null;
     }
 
-    function localDateKey(epochTs) {
+    // Daily integration walks thousands of consecutive segments that nearly
+    // always fall in the same local day. Remembering the last resolved day
+    // turns four Date constructions per segment into a numeric range check.
+    // This is a pure memo: identical input still yields identical output, and
+    // the local-midnight boundaries stay DST-correct because they are still
+    // derived from new Date(year, month, day).
+    let cachedLocalDay = null;
+
+    function localDayFor(epochTs) {
+      if (cachedLocalDay !== null &&
+          epochTs >= cachedLocalDay.start && epochTs < cachedLocalDay.end) {
+        return cachedLocalDay;
+      }
       const date = new Date(epochTs * 1000);
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      const monthIndex = date.getMonth();
+      const dayOfMonth = date.getDate();
+      cachedLocalDay = {
+        start: new Date(year, monthIndex, dayOfMonth).getTime() / 1000,
+        end: new Date(year, monthIndex, dayOfMonth + 1).getTime() / 1000,
+        key: `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`
+      };
+      return cachedLocalDay;
+    }
+
+    function localDateKey(epochTs) {
+      return localDayFor(epochTs).key;
     }
 
     function localDayBounds(epochTs) {
-      const date = new Date(epochTs * 1000);
-      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 1000;
-      const end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime() / 1000;
-      return { start, end };
+      const day = localDayFor(epochTs);
+      return { start: day.start, end: day.end };
     }
 
     function integrateDailyEnergy(points) {
-      const sorted = points
-        .filter((point) => point && Number.isFinite(point.epochTs) && Number.isFinite(point.powerUw))
-        .slice()
-        .sort((a, b) => a.epochTs - b.epochTs);
+      const sorted = finitePowerPointsByEpoch(points);
       const spacingS = medianPositiveSpacingS(sorted);
       const allowedGapS = Number.isFinite(spacingS) ? 3 * spacingS : null;
       const days = new Map();
@@ -3013,20 +3419,20 @@
 
         let cursor = from.epochTs;
         while (cursor < to.epochTs) {
-          const bounds = localDayBounds(cursor);
-          const segmentEnd = Math.min(to.epochTs, bounds.end);
+          const day = localDayFor(cursor);
+          const segmentEnd = Math.min(to.epochTs, day.end);
           const startFraction = (cursor - from.epochTs) / totalDurationS;
           const endFraction = (segmentEnd - from.epochTs) / totalDurationS;
           const startPowerUw = from.powerUw + (to.powerUw - from.powerUw) * startFraction;
           const endPowerUw = from.powerUw + (to.powerUw - from.powerUw) * endFraction;
           const durationS = segmentEnd - cursor;
           const energyJ = ((startPowerUw + endPowerUw) / 2) * durationS * 1e-6;
-          const key = localDateKey(cursor);
+          const key = day.key;
           const aggregate = days.get(key) || {
             date: key,
             energyJ: 0,
             coverageS: 0,
-            dayLengthS: bounds.end - bounds.start
+            dayLengthS: day.end - day.start
           };
           if (Number.isFinite(energyJ) && durationS > 0) {
             aggregate.energyJ += energyJ;
@@ -3265,7 +3671,57 @@
       clearError();
       analyticsSettings = { capacitanceF, regressionWindowMinutes };
       saveAnalyticsSettings();
-      renderAnalytics();
+      scheduleRender(RENDER_ANALYTICS);
+    }
+
+    // Everything from the storage-power regression through the daily energy
+    // table depends only on (historyRecords, capacitance, window). Recomputing
+    // it was previously triggered by every render, including renders caused by
+    // a configuration display refresh that changed none of those inputs.
+    function analyticsPipeline() {
+      const capacitanceF = analyticsSettings.capacitanceF;
+      const windowMinutes = analyticsSettings.regressionWindowMinutes;
+      if (analyticsCache !== null &&
+          analyticsCache.version === historyVersion &&
+          analyticsCache.capacitanceF === capacitanceF &&
+          analyticsCache.windowMinutes === windowMinutes) {
+        return analyticsCache;
+      }
+
+      // With no VSTOR-valid record held, selectValidVstorSamples() is provably
+      // empty and computeNetStoragePower() takes its own no-spacing early
+      // return. Building that exact result skips a full scan of the history.
+      let result;
+      if (historySummary().hasVstor) {
+        result = computeNetStoragePower(historyRecords, capacitanceF, windowMinutes);
+      } else {
+        const windowSeconds = Number(windowMinutes) * 60;
+        result = Object.freeze({
+          points: Object.freeze([]),
+          spacingS: null,
+          sourceSampleCount: 0,
+          windowSeconds: Number.isFinite(windowSeconds) ? windowSeconds : null
+        });
+      }
+
+      const inference = estimateDarkBaseline(
+        result.points,
+        windowMinutes,
+        DARK_THRESHOLDS_LUX
+      );
+      const harvestPoints = estimateHarvestPoints(result.points, inference.baselineUw);
+
+      analyticsCache = Object.freeze({
+        version: historyVersion,
+        capacitanceF,
+        windowMinutes,
+        result,
+        inference,
+        harvestPoints,
+        luxSlope: fitHarvestLuxSlope(harvestPoints),
+        days: integrateDailyEnergy(harvestPoints)
+      });
+      return analyticsCache;
     }
 
     function initPowerCharts() {
@@ -3389,11 +3845,11 @@
     }
 
     function renderAnalytics() {
-      const result = computeNetStoragePower(
-        historyRecords,
-        analyticsSettings.capacitanceF,
-        analyticsSettings.regressionWindowMinutes
-      );
+      // Hidden for every bare configuration and before the first STATUS.
+      // renderCapabilities reschedules this pass when it unhides the section.
+      if (ui.powerSection.hidden) return;
+
+      const { result, inference, harvestPoints, luxSlope, days } = analyticsPipeline();
       const hasVstorRecords = result.sourceSampleCount > 0;
       const latestPoint = result.points.at(-1);
       ui.latestNetPower.textContent = latestPoint ? `${latestPoint.powerUw.toFixed(1)} µW` : '—';
@@ -3432,11 +3888,6 @@
         ui.powerChartFallback.classList.toggle('visible', result.points.length === 0);
       }
 
-      const inference = estimateDarkBaseline(
-        result.points,
-        analyticsSettings.regressionWindowMinutes,
-        DARK_THRESHOLDS_LUX
-      );
       renderCandidateCards(inference);
       const accepted = inference.acceptedIndex === null
         ? null
@@ -3463,13 +3914,11 @@
         }
       }
 
-      const harvestPoints = estimateHarvestPoints(result.points, inference.baselineUw);
       const latestHarvest = harvestPoints.at(-1);
       ui.latestEstimatedHarvest.textContent = latestHarvest
         ? `${latestHarvest.powerUw.toFixed(1)} µW`
         : '—';
-      const slope = fitHarvestLuxSlope(harvestPoints);
-      ui.harvestLuxSlope.textContent = Number.isFinite(slope) ? `${slope.toFixed(3)} µW/lux` : '—';
+      ui.harvestLuxSlope.textContent = Number.isFinite(luxSlope) ? `${luxSlope.toFixed(3)} µW/lux` : '—';
       if (harvestChart) {
         harvestChart.data.datasets[0].data = harvestPoints.map((point) => ({
           x: point.epochTs * 1000,
@@ -3478,7 +3927,7 @@
         harvestChart.update('none');
         ui.harvestChartFallback.classList.toggle('visible', harvestPoints.length === 0);
       }
-      renderDailyEnergy(integrateDailyEnergy(harvestPoints));
+      renderDailyEnergy(days);
     }
 
     function detectBluetoothSupport() {
@@ -3507,10 +3956,13 @@
     ui.chartOlder.addEventListener('click', () => panChart(-CHART_PAN_FRACTION));
     ui.chartNewer.addEventListener('click', () => panChart(CHART_PAN_FRACTION));
     ui.chartPosition.addEventListener('input', handleChartPositionInput);
-    ui.chartCanvas.addEventListener('pointerdown', handleChartPointerDown);
-    ui.chartCanvas.addEventListener('pointermove', handleChartPointerMove);
-    ui.chartCanvas.addEventListener('pointerup', handleChartPointerUp);
-    ui.chartCanvas.addEventListener('pointercancel', handleChartPointerUp);
+    // None of the pointer handlers call preventDefault, so marking them passive
+    // lets the compositor scroll the page without waiting on this listener.
+    // The wheel handler does call preventDefault and must stay non-passive.
+    ui.chartCanvas.addEventListener('pointerdown', handleChartPointerDown, { passive: true });
+    ui.chartCanvas.addEventListener('pointermove', handleChartPointerMove, { passive: true });
+    ui.chartCanvas.addEventListener('pointerup', handleChartPointerUp, { passive: true });
+    ui.chartCanvas.addEventListener('pointercancel', handleChartPointerUp, { passive: true });
     ui.chartCanvas.addEventListener('wheel', handleChartWheel, { passive: false });
 
     ui.capacitanceInput.value = String(analyticsSettings.capacitanceF);
@@ -3521,12 +3973,35 @@
     window.chartNavigationSelfTest = chartNavigationSelfTest;
     window.powerMathSelfTest = powerMathSelfTest;
     window.inferenceMathSelfTest = inferenceMathSelfTest;
-    window.tempBridgeSelfTest = () => Object.freeze({
-      protocol: protocolSelfTest(),
-      chart: chartNavigationSelfTest(),
-      power: powerMathSelfTest(),
-      inference: inferenceMathSelfTest()
-    });
+    window.tempBridgeSelfTest = () => {
+      // Renders are coalesced into animation frames, so settle any pending one
+      // before reporting: release QA should never read a half-applied UI.
+      flushRenderNow();
+      return Object.freeze({
+        protocol: protocolSelfTest(),
+        chart: chartNavigationSelfTest(),
+        power: powerMathSelfTest(),
+        inference: inferenceMathSelfTest()
+      });
+    };
+
+    // Chart.js can arrive after this script when the same-origin copy is absent
+    // and the pinned CDN build is fetched instead. Clear the "did not load"
+    // state and let the normal lazy initialisation in each render build the
+    // charts. Nothing else in the app depends on the library being present.
+    window.onChartLibraryReady = () => {
+      if (typeof Chart === 'undefined' || historyChart) return;
+      for (const canvas of [ui.chartCanvas, ui.rawChartCanvas,
+                            ui.powerChartCanvas, ui.harvestChartCanvas]) {
+        canvas.hidden = false;
+      }
+      for (const fallback of [ui.chartFallback, ui.rawChartFallback,
+                              ui.powerChartFallback, ui.harvestChartFallback]) {
+        fallback.classList.remove('visible');
+      }
+      rawChartRenderedVersion = -1;
+      scheduleRender(RENDER_EVERYTHING);
+    };
 
     initChart();
     renderHistory();
