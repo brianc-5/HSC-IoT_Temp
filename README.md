@@ -1,6 +1,7 @@
-# TempBridge Web
+# HSC T+ Sensor — web client
 
-Static Web Bluetooth client for the TempBridge BLE bridge. This repository
+Static Web Bluetooth client for the `HSC T+ Bridge`, part of the HSC T+ Sensor
+system. This repository
 contains no sensor firmware, bridge firmware, measurements, or sensor MAC.
 
 ## Publish with GitHub Pages
@@ -14,7 +15,7 @@ contains no sensor firmware, bridge firmware, measurements, or sensor MAC.
 3. Select **Deploy from a branch**, branch `main`, folder `/(root)`.
 4. Open the HTTPS address displayed by GitHub in Chrome for Android.
 
-Tap **Connect**, select `TempBridge`, then use **Sync history** and **Export
+Tap **Connect**, select `HSC T+ Bridge`, then use **Sync history** and **Export
 CSV**. The page reports the automatically detected bare/HAT and USB/external
 configuration, displays the sensor's reported cadence, and enables only the
 measurements and power analysis supported by that configuration. The bridge

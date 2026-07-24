@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1a">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="Web Bluetooth client for the Protocol v3 TempBridge: live samples, retained history, CSV export, and harvested-power analysis.">
-  <title>TempBridge</title>
+  <meta name="description" content="HSC T+ Sensor — Web Bluetooth client for the Protocol v3 bridge: live samples, retained history, CSV export, and harvested-power analysis.">
+  <title>HSC T+ Sensor</title>
 
   <!-- Production hosting: GitHub Pages or another HTTPS static host. -->
   <!-- Local fallback: python3 -m http.server 8000, optionally with adb reverse tcp:8000 tcp:8000. -->
@@ -53,7 +53,342 @@
     main {
       width: min(1100px, calc(100% - 28px));
       margin: 0 auto;
-      padding: max(28px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+      /* Bottom padding clears the floating tab bar plus the home indicator. */
+      padding:
+        max(28px, env(safe-area-inset-top)) 0
+        calc(96px + env(safe-area-inset-bottom));
+    }
+
+    /* ---- Views -------------------------------------------------------- */
+    /* Only one view is in the layout at a time, so no view can lengthen the
+       page for another. Charts are explicitly resized on reveal because a
+       display:none canvas has no measurable box for Chart.js to read. */
+    .view[hidden] {
+      display: none !important;
+    }
+
+    .view-heading {
+      margin-bottom: 16px;
+    }
+
+    .view-heading h2 {
+      margin-bottom: 4px;
+      color: var(--text);
+      font-size: 1.05rem;
+      letter-spacing: -0.01em;
+      text-transform: none;
+    }
+
+    .view-heading p {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+
+    /* ---- Navigation --------------------------------------------------- */
+    /* One element, two shapes: a floating tab bar on phones, a fixed rail on
+       wide screens where a bottom bar would waste vertical space. */
+    .app-nav {
+      position: fixed;
+      z-index: 20;
+      right: max(10px, env(safe-area-inset-right));
+      bottom: max(10px, env(safe-area-inset-bottom));
+      left: max(10px, env(safe-area-inset-left));
+      display: flex;
+      gap: 2px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: rgb(15 23 38 / 0.86);
+      box-shadow: 0 12px 40px rgb(0 0 0 / 0.45);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+    }
+
+    .nav-item {
+      display: flex;
+      min-width: 0;
+      min-height: 52px;
+      flex: 1 1 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 6px 2px;
+      border: 0;
+      border-radius: 14px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.58rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: color 140ms ease, background 140ms ease, opacity 140ms ease, filter 140ms ease;
+    }
+
+    .nav-item svg {
+      width: 21px;
+      height: 21px;
+      flex: 0 0 auto;
+      stroke: currentColor;
+      stroke-width: 1.7;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .nav-label {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .nav-item[aria-current="page"] {
+      background: rgb(68 215 182 / 0.14);
+      color: var(--accent-strong);
+    }
+
+    .nav-item:not([aria-disabled="true"]):hover {
+      color: var(--text);
+    }
+
+    .nav-item:focus-visible {
+      outline: 3px solid rgb(101 169 255 / 0.35);
+      outline-offset: -2px;
+    }
+
+    /* Keep unavailable entries readable and focusable so keyboard and screen
+       reader users can discover why a view is unavailable. */
+    .nav-item.unavailable {
+      cursor: not-allowed;
+      opacity: 0.48;
+      filter: saturate(0.4);
+    }
+
+    .nav-item.unavailable svg {
+      filter: blur(0.65px);
+    }
+
+    .nav-item.unavailable:hover {
+      color: var(--muted);
+    }
+
+    .nav-feedback {
+      position: fixed;
+      z-index: 21;
+      right: max(14px, env(safe-area-inset-right));
+      bottom: calc(86px + env(safe-area-inset-bottom));
+      left: max(14px, env(safe-area-inset-left));
+      margin: 0 auto;
+      padding: 10px 13px;
+      border: 1px solid rgb(101 169 255 / 0.34);
+      border-radius: 11px;
+      background: rgb(8 12 20 / 0.94);
+      box-shadow: 0 8px 28px rgb(0 0 0 / 0.38);
+      color: var(--text);
+      font-size: 0.78rem;
+      line-height: 1.4;
+      pointer-events: none;
+    }
+
+    @media (min-width: 900px) {
+      .app-nav {
+        top: 0;
+        right: auto;
+        bottom: 0;
+        left: 0;
+        width: 104px;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        padding: 14px 10px;
+        border: 0;
+        border-right: 1px solid var(--border);
+        border-radius: 0;
+        background: rgb(12 19 31 / 0.72);
+        box-shadow: none;
+      }
+
+      .nav-item {
+        min-height: 66px;
+        flex: 0 0 auto;
+        gap: 6px;
+        font-size: 0.63rem;
+      }
+
+      .nav-item svg {
+        width: 23px;
+        height: 23px;
+      }
+
+      body {
+        padding-left: 104px;
+      }
+
+      main {
+        padding-bottom: 48px;
+      }
+
+      .nav-feedback {
+        right: auto;
+        bottom: 18px;
+        left: 122px;
+        width: min(420px, calc(100% - 140px));
+      }
+    }
+
+    /* ---- Reference page ----------------------------------------------- */
+    .reference-card {
+      padding: 24px;
+    }
+
+    .reference-card + .reference-card {
+      margin-top: 18px;
+    }
+
+    .reference-card > h2 {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.02rem;
+      letter-spacing: -0.01em;
+      text-transform: none;
+    }
+
+    .reference-card h3 {
+      margin: 22px 0 8px;
+      color: var(--accent-strong);
+      font-size: 0.95rem;
+      font-weight: 650;
+    }
+
+    .reference-card h3:first-of-type {
+      margin-top: 14px;
+    }
+
+    .reference-card p,
+    .reference-card li {
+      color: #cbd6e6;
+      font-size: 0.88rem;
+      line-height: 1.65;
+    }
+
+    .reference-card p + p {
+      margin-top: 10px;
+    }
+
+    .reference-card ul,
+    .reference-card ol {
+      margin: 10px 0 0;
+      padding-left: 20px;
+    }
+
+    .reference-card li + li {
+      margin-top: 7px;
+    }
+
+    .reference-card strong {
+      color: var(--text);
+    }
+
+    .formula {
+      overflow-x: auto;
+      margin: 12px 0;
+      padding: 13px 15px;
+      border: 1px solid rgb(101 169 255 / 0.26);
+      border-radius: 11px;
+      background: rgb(8 12 20 / 0.5);
+      color: var(--accent-strong);
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      white-space: pre;
+    }
+
+    .formula .annot {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+    }
+
+    .pipeline {
+      display: grid;
+      gap: 10px;
+      margin: 14px 0 4px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .pipeline-stage {
+      padding: 14px;
+      border: 1px solid rgb(38 52 75 / 0.8);
+      border-radius: 12px;
+      background: rgb(8 12 20 / 0.4);
+    }
+
+    .pipeline-stage span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--accent);
+      font-size: 0.66rem;
+      font-weight: 650;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .pipeline-stage strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.92rem;
+    }
+
+    .pipeline-stage small {
+      color: var(--muted);
+      font-size: 0.77rem;
+      line-height: 1.5;
+    }
+
+    .credits {
+      margin-top: 18px;
+      padding: 20px;
+      border: 1px solid rgb(68 215 182 / 0.3);
+      border-radius: 14px;
+      background: rgb(68 215 182 / 0.06);
+    }
+
+    .credits .credit-name {
+      margin-bottom: 3px;
+      color: var(--accent-strong);
+      font-size: 1.05rem;
+      font-weight: 650;
+    }
+
+    .credits .credit-role {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .credits hr {
+      margin: 16px 0;
+      border: 0;
+      border-top: 1px solid rgb(68 215 182 / 0.2);
+    }
+
+    .reference-table th,
+    .reference-table td {
+      padding: 9px 14px;
+      font-size: 0.82rem;
+      text-align: left;
+      white-space: normal;
+    }
+
+    .reference-table td:first-child {
+      color: var(--accent-strong);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: nowrap;
     }
 
     header {
@@ -720,13 +1055,28 @@
       .chart-view-meta span:last-child {
         text-align: left;
       }
+
+      /* Formulas keep their alignment (white-space: pre), so shrink the type
+         rather than wrap it; each block still scrolls on its own if needed. */
+      .formula {
+        font-size: 0.78rem;
+      }
+
+      .formula .annot {
+        font-size: 0.72rem;
+      }
+
+      .reference-card,
+      .credits {
+        padding: 18px;
+      }
     }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <h1>Temp<span>Bridge</span></h1>
+      <h1>HSC <span>T+</span> Sensor</h1>
       <div class="connection-state" role="status" aria-live="polite">
         <span id="stateDot" class="state-dot"></span>
         <span id="connectionText">Not connected</span>
@@ -736,7 +1086,7 @@
     <div id="featureNotice" class="notice" role="alert"></div>
     <div id="errorMessage" class="error-message" role="alert" aria-live="assertive"></div>
 
-    <section class="config-banner" aria-label="Detected sensor configuration" aria-live="polite">
+    <section id="configBanner" class="config-banner" aria-label="Detected sensor configuration" aria-live="polite">
       <div>
         <strong id="configurationName">Configuration unknown</strong>
         <span id="configurationDetail">Connect to a Protocol v3 bridge to detect the sensor hardware and power source automatically.</span>
@@ -744,6 +1094,7 @@
       <span id="configurationCadence" class="cadence-badge">Interval unknown</span>
     </section>
 
+    <div id="view-live" class="view">
     <section class="grid" aria-label="Current reading and bridge controls">
       <article class="card live-card">
         <h2 id="temperatureHeading">Current temperature</h2>
@@ -801,7 +1152,9 @@
         </article>
       </div>
     </section>
+    </div>
 
+    <div id="view-history" class="view" hidden>
     <section class="card history-card" aria-labelledby="chartTitle">
       <div class="section-heading">
         <h2 id="chartTitle">Measurement history</h2>
@@ -831,7 +1184,9 @@
         <p id="chartFallback" class="chart-fallback">Sync history to populate the chart.</p>
       </div>
     </section>
+    </div>
 
+    <div id="view-storage" class="view" hidden>
     <section id="rawStorageSection" class="card history-card" aria-labelledby="rawStorageTitle" hidden>
       <div class="section-heading">
         <h2 id="rawStorageTitle">Raw VSTOR and illuminance history</h2>
@@ -842,7 +1197,9 @@
         <p id="rawChartFallback" class="chart-fallback">No timestamped HAT samples are available.</p>
       </div>
     </section>
+    </div>
 
+    <div id="view-power" class="view" hidden>
     <section id="powerSection" class="card history-card" aria-labelledby="powerTitle" hidden>
       <div class="section-heading">
         <h2 id="powerTitle" class="estimated-label">Estimated panel harvest into VSTOR</h2>
@@ -909,7 +1266,9 @@
         </table>
       </div>
     </section>
+    </div>
 
+    <div id="view-records" class="view" hidden>
     <section class="card table-card" aria-labelledby="tableTitle">
       <div class="section-heading">
         <h2 id="tableTitle">Recent records</h2>
@@ -935,7 +1294,243 @@
         </table>
       </div>
     </section>
+    </div>
+
+    <div id="view-reference" class="view" hidden>
+      <div class="view-heading">
+        <h2>Reference</h2>
+        <p>The measurement chain, the estimators behind every number this page
+          reports, and their stated limits.</p>
+      </div>
+
+      <article class="card reference-card">
+        <h2>System architecture</h2>
+        <p>Three independent devices, each with a single responsibility. The
+          binary contract between them is frozen at Protocol v3, so any stage
+          can be rebuilt without touching the others.</p>
+
+        <div class="pipeline">
+          <div class="pipeline-stage">
+            <span>Stage 1 · Sensor</span>
+            <strong>XIAO nRF52840 (Zephyr)</strong>
+            <small>Wakes on a configured cadence, powers the Logger HAT rail only
+              for the measurement, reads ambient temperature and humidity
+              (SHT40), illuminance (BH1750) and the VSTOR divider, then
+              broadcasts one BTHome v2 advertisement burst and sleeps. It detects
+              its own hardware and power source and reports both on air, so no
+              mode is ever selected by hand.</small>
+          </div>
+          <div class="pipeline-stage">
+            <span>Stage 2 · Bridge</span>
+            <strong>XIAO nRF52840 (USB powered)</strong>
+            <small>Scans continuously for the commissioned sensor address,
+              rejects duplicate and implausible frames, maintains an extended
+              sequence number and a wrap-safe clock, and appends every accepted
+              sample to a CRC-protected QSPI log that retains the newest 4,096
+              records across power loss. It serves them over GATT while still
+              scanning.</small>
+          </div>
+          <div class="pipeline-stage">
+            <span>Stage 3 · This page</span>
+            <strong>Web Bluetooth client</strong>
+            <small>Validates the 16-byte STATUS before parsing anything, sets the
+              bridge clock, streams history, and derives every chart and
+              estimate below in the browser. Measurements never leave the phone:
+              the static host serves only the application files.</small>
+          </div>
+        </div>
+
+        <h3>Record and retention model</h3>
+        <p>Each record is exactly 16 bytes: epoch seconds, extended sequence,
+          temperature, voltage, illuminance, humidity, RSSI and a flag byte. The
+          flag byte carries the configuration ID, whether the voltage is a valid
+          VSTOR reading, and whether the temperature is ambient or MCU die.
+          Unavailable fields use explicit sentinels rather than zero, so a failed
+          sensor never fabricates a measurement.</p>
+        <p>The bridge retains 4,096 records. Coverage is simply
+          <strong>4096 × sample interval</strong>: about 22.8 hours at a
+          20-second cadence, or about 8.5 days at 180 seconds.</p>
+
+        <h3>Time and identity</h3>
+        <p>The bridge stores uptime until a phone writes the epoch, then
+          normalises earlier current-boot records through a separate CRC-checked
+          patch log. Records recovered from an earlier boot that were never
+          patched keep epoch zero rather than being reinterpreted with a later
+          offset — an unknown timestamp is reported as unknown.</p>
+        <p>This page keys held records on epoch plus sequence, so a 16-bit
+          sequence wrap cannot overwrite older data, and re-syncing is
+          idempotent.</p>
+      </article>
+
+      <article class="card reference-card">
+        <h2>Mathematical models</h2>
+        <p>Everything in the Power view is an estimate built on a stated
+          assumption. Each model below names the assumption it depends on and
+          the condition under which it refuses to produce a number.</p>
+
+        <h3>1 · Net storage power</h3>
+        <p>The supercapacitor is an energy store, so the power crossing its
+          terminals is the time derivative of its stored energy
+          <em>E</em> = ½·C·V²:</p>
+        <div class="formula">P_net(t) = C · V(t) · dV/dt<span class="annot">C  = storage capacitance (F, your setting)
+V  = VSTOR at the sample (V)
+Positive P_net means the store is charging; negative means it is draining.</span></div>
+        <p>The derivative is not a finite difference between adjacent samples,
+          which would amplify ADC noise. It is the slope of an ordinary
+          least-squares fit over a trailing window, computed in mean-centred
+          form for numerical stability:</p>
+        <div class="formula">dV/dt = Σ(tᵢ − t̄)(Vᵢ − V̄) ⁄ Σ(tᵢ − t̄)²<span class="annot">Window = your trailing window setting, default 45 min.
+Spacing comes from the record timestamps themselves, never from a nominal cadence.</span></div>
+        <p><strong>Refuses to produce a value when:</strong> the window holds
+          fewer than 6 valid samples, or any gap inside it exceeds three times
+          the measured median spacing. A regression spanning an outage would
+          otherwise report a slope across data that does not exist.</p>
+        <p><strong>Eligibility:</strong> only records whose flag bit marks the
+          voltage as valid VSTOR participate. Regulated VDD readings and
+          out-of-band values are excluded, never rescaled.</p>
+
+        <h3>2 · Dark drain baseline</h3>
+        <p>Harvest cannot be separated from consumption by measuring VSTOR
+          alone — the store only ever shows the net of the two. In darkness,
+          however, harvest is zero, so whatever the store loses is the system's
+          own drain:</p>
+        <div class="formula">P_drain ≈ median( −P_net )<span class="annot">…over every estimate whose illuminance is below a lux threshold.
+Median, not mean, so a few contaminated samples cannot drag the baseline.</span></div>
+        <p>The difficulty is choosing the threshold. Too high and residual
+          daylight leaks in, understating the drain; too low and there is not
+          enough data. Rather than fixing one, the page evaluates three
+          cumulative bands — below 1, 3 and 5 lux — and tests whether adjacent
+          bands agree:</p>
+        <div class="formula">|D_high − D_low| ≤ max(5 µW, 20 % · D_low)<span class="annot">D_low, D_high = drain estimated from the lower and upper band of an
+adjacent pair. If it holds, the lower band is accepted.
+Agreement between two differently contaminated bands is evidence
+that neither is contaminated.</span></div>
+        <p>Each candidate band needs at least 30 net-power estimates spanning a
+          full regression window. Confidence is reported as High, Moderate or
+          Low from how much supporting coverage the neighbouring band has.</p>
+        <p><strong>Refuses to produce a value when:</strong> no adjacent pair
+          agrees, or the stable estimate is non-positive. A non-positive dark
+          drain contradicts the constant-drain premise, so the page reports the
+          baseline as unavailable rather than substituting zero — which would
+          silently turn every net-power reading into a harvest figure.</p>
+
+        <h3>3 · Harvested power into storage</h3>
+        <p>With a drain baseline accepted, harvest is the net rate plus what the
+          system was consuming at the same time:</p>
+        <div class="formula">P_harvest = max(0, P_net + P_drain)<span class="annot">The clamp encodes a physical fact: a photovoltaic cell cannot deliver negative power.</span></div>
+        <p><strong>Assumption:</strong> the storage-plane drain is approximately
+          constant across light and dark. This is the weakest link in the chain
+          and the reason every harvest figure on this page is labelled
+          estimated.</p>
+        <p><strong>Boundary:</strong> this is power delivered <em>into</em>
+          VSTOR. It is not raw panel-terminal power, and no buck-converter
+          efficiency is applied in either direction.</p>
+
+        <h3>4 · Harvest–illuminance response</h3>
+        <p>A least-squares fit constrained through the origin, since zero light
+          must give zero harvest:</p>
+        <div class="formula">k = Σ(Eᵢ · Pᵢ) ⁄ Σ(Eᵢ²)      [µW per lux]<span class="annot">E = illuminance (lux), P = estimated harvest (µW).
+A single-slope summary of the cell's indoor response, not a calibration.</span></div>
+
+        <h3>5 · Daily energy</h3>
+        <p>Trapezoidal integration of the harvest series, split at local
+          midnight so a segment crossing the boundary is apportioned by linear
+          interpolation between its endpoints:</p>
+        <div class="formula">E = Σ ½·(Pᵢ + Pᵢ₊₁)·(tᵢ₊₁ − tᵢ)<span class="annot">Reported in mWh or µWh. Intervals longer than three times the median spacing are dropped, not bridged.</span></div>
+        <p>Each day reports its own coverage. A day is marked complete only
+          above 95 % coverage; anything else is labelled a partial day, so a
+          gap can never masquerade as a low-energy day.</p>
+
+        <h3>6 · Chart gap handling</h3>
+        <p>Chart lines break rather than interpolate across an interval longer
+          than <strong>max(5 min, 3.5 × cadence)</strong>. A straight line drawn
+          through a bridge or sensor outage would imply measurements that were
+          never taken.</p>
+      </article>
+
+      <article class="card reference-card">
+        <h2>Reading the configuration badge</h2>
+        <p>The sensor reports what hardware it found and how it is powered. This
+          page enables only what that configuration can actually support, and
+          blurs the navigation entries it cannot.</p>
+        <div class="table-wrap">
+          <table class="reference-table">
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Configuration</th>
+                <th scope="col">Available analysis</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>0</td><td>Legacy / unknown</td><td>Live, history, records and CSV. Power analysis only if a record explicitly marks VSTOR valid.</td></tr>
+              <tr><td>1</td><td>Bare XIAO + USB</td><td>MCU die temperature and regulated VDD. No storage plane to analyse.</td></tr>
+              <tr><td>2</td><td>Bare XIAO + external</td><td>MCU die temperature and VDD. VSTOR is not observable without the HAT divider.</td></tr>
+              <tr><td>3</td><td>HAT + USB</td><td>Ambient temperature, humidity and lux. VSTOR is deliberately invalidated while USB powered.</td></tr>
+              <tr><td>4</td><td>HAT + external</td><td>Everything, including storage and harvest analysis.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>VSTOR is accepted only within <strong>1500–4500 mV</strong>. The
+          sensor, the bridge and this page all enforce the same band, so an
+          implausible reading is rejected at the first stage that sees it.</p>
+      </article>
+
+      <article class="card reference-card">
+        <h2>Credits</h2>
+        <div class="credits">
+          <p class="credit-name">Brian Chirio</p>
+          <p class="credit-role">Developer of the complete system — sensor
+            firmware, bridge firmware, wire protocol, hardware integration and
+            this web application.</p>
+          <p class="credit-role">BSc Electrical Engineering, Tampere
+            University.</p>
+          <hr>
+          <p class="credit-role">Developed for the <strong>Hybrid Solar Cells
+            (HSC)</strong> research group, led by <strong>Paola Vivo</strong>.</p>
+        </div>
+        <h3>Built with</h3>
+        <p>Zephyr RTOS on the sensor, the Adafruit nRF52 / Bluefruit core on the
+          bridge, BTHome v2 for the advertisement encoding, Web Bluetooth for
+          the phone link, and Chart.js for the plots. Chart.js is served from
+          this same origin, so the page works with no internet connection and
+          contacts no third party.</p>
+        <h3>Privacy</h3>
+        <p>Measurements travel from the bridge to this page over Bluetooth and
+          stay in the browser. The static host serves the page and never
+          receives any data. Only your capacitance and regression-window
+          settings are stored locally, on this device.</p>
+      </article>
+    </div>
   </main>
+
+  <nav id="appNav" class="app-nav" aria-label="Sections">
+    <button class="nav-item" type="button" data-view="live" aria-controls="view-live" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h4l3 7 4-16 3 9h4"/></svg>
+      <span class="nav-label">Live</span>
+    </button>
+    <button class="nav-item" type="button" data-view="history" aria-controls="view-history">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+      <span class="nav-label">History</span>
+    </button>
+    <button class="nav-item" type="button" data-view="storage" aria-controls="view-storage">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12"/><path d="M6 17h12"/><path d="M12 7v10"/><circle cx="12" cy="12" r="9"/></svg>
+      <span class="nav-label">Storage</span>
+    </button>
+    <button class="nav-item" type="button" data-view="power" aria-controls="view-power">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>
+      <span class="nav-label">Power</span>
+    </button>
+    <button class="nav-item" type="button" data-view="records" aria-controls="view-records">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16"/><path d="M10 10v10"/></svg>
+      <span class="nav-label">Records</span>
+    </button>
+    <button class="nav-item" type="button" data-view="reference" aria-controls="view-reference">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 016.5 3H19v15H6.5A2.5 2.5 0 004 20.5z"/><path d="M9 8h6"/><path d="M9 12h4"/></svg>
+      <span class="nav-label">Reference</span>
+    </button>
+  </nav>
+  <p id="navFeedback" class="nav-feedback" role="status" aria-live="polite" hidden></p>
 
   <!-- Same-origin copy first: no cross-origin DNS/TCP/TLS round trip, usable
        with no internet in the field, and nothing is disclosed to a third
@@ -986,7 +1581,11 @@
     const FLAG_CONFIG_MASK = 0x0e;
     const FLAG_VSTOR_VALID = 0x10;
     const FLAG_AMBIENT_TEMP = 0x20;
-    const ANALYTICS_SETTINGS_KEY = 'tempbridge.analytics.v3';
+    // Name shown before the peripheral reports its own, and in the picker copy.
+    const BRIDGE_FALLBACK_NAME = 'HSC T+ Bridge';
+    const ANALYTICS_SETTINGS_KEY = 'hsc-tplus.analytics.v3';
+    // Settings saved under the previous product name are migrated once.
+    const LEGACY_ANALYTICS_SETTINGS_KEY = 'tempbridge.analytics.v3';
     const DARK_THRESHOLDS_LUX = Object.freeze([1, 3, 5]);
     const DEFAULT_CHART_WINDOW_MS = 60 * 60 * 1000;
     const CHART_POSITION_STEPS = 1000;
@@ -1098,7 +1697,14 @@
       harvestChartCanvas: document.querySelector('#harvestChart'),
       dailyEnergyBody: document.querySelector('#dailyEnergyBody'),
       hatFields: Array.from(document.querySelectorAll('.hat-field')),
-      hatColumns: Array.from(document.querySelectorAll('.hat-column'))
+      hatColumns: Array.from(document.querySelectorAll('.hat-column')),
+      configBanner: document.querySelector('#configBanner'),
+      navFeedback: document.querySelector('#navFeedback'),
+      navButtons: Array.from(document.querySelectorAll('.nav-item')),
+      viewElements: Object.fromEntries(
+        Array.from(document.querySelectorAll('.view'))
+          .map((element) => [element.id.replace(/^view-/, ''), element])
+      )
     };
 
     const ble = {
@@ -1134,6 +1740,11 @@
     let latestStatus = null;
     let currentConfigId = 0;
     let currentSampleIntervalMs = 0;
+    // Declared before the call below: loadAnalyticsSettings() assigns it, and a
+    // `let` further down the file would still be in its temporal dead zone
+    // there - a ReferenceError the function's own try/catch would swallow,
+    // silently discarding the user's saved settings.
+    let analyticsSettingsNeedMigration = false;
     let analyticsSettings = loadAnalyticsSettings();
     let chartView = {
       durationMs: DEFAULT_CHART_WINDOW_MS,
@@ -1141,6 +1752,116 @@
       followingLatest: true
     };
     let chartDrag = null;
+    let navFeedbackTimer = 0;
+
+    // ---- View navigation ---------------------------------------------------
+    // Only the active view is in the layout, so no section can lengthen the
+    // page for another. `requires` names the capability a view needs; a view
+    // whose capability is missing keeps its navigation entry visible but
+    // blurred and inert, so the reason stays discoverable.
+    const VIEWS = Object.freeze([
+      Object.freeze({ id: 'live', requires: null, showsConfigBanner: true }),
+      Object.freeze({ id: 'history', requires: null, showsConfigBanner: true }),
+      Object.freeze({ id: 'storage', requires: 'storage', showsConfigBanner: true }),
+      Object.freeze({ id: 'power', requires: 'power', showsConfigBanner: true }),
+      Object.freeze({ id: 'records', requires: null, showsConfigBanner: true }),
+      Object.freeze({ id: 'reference', requires: null, showsConfigBanner: false })
+    ]);
+    const DEFAULT_VIEW = 'live';
+
+    let activeView = DEFAULT_VIEW;
+    let viewCapabilities = {
+      storage: { available: false, reason: 'Connect to detect the sensor configuration.' },
+      power: { available: false, reason: 'Connect to detect the sensor configuration.' }
+    };
+
+    function viewById(id) {
+      return VIEWS.find((view) => view.id === id) || null;
+    }
+
+    function viewIsAvailable(view) {
+      if (!view) return false;
+      if (view.requires === null) return true;
+      const capability = viewCapabilities[view.requires];
+      return Boolean(capability && capability.available);
+    }
+
+    function showNavFeedback(message = '') {
+      window.clearTimeout(navFeedbackTimer);
+      ui.navFeedback.textContent = message;
+      ui.navFeedback.hidden = message.length === 0;
+      if (message.length !== 0) {
+        navFeedbackTimer = window.setTimeout(() => {
+          ui.navFeedback.hidden = true;
+        }, 5000);
+      }
+    }
+
+    function setActiveView(id, { force = false } = {}) {
+      const view = viewById(id);
+      if (!view) return;
+      if (!force && !viewIsAvailable(view)) {
+        const capability = view.requires === null
+          ? null
+          : viewCapabilities[view.requires];
+        showNavFeedback(capability?.reason || 'This view is not available.');
+        return;
+      }
+      showNavFeedback();
+      activeView = view.id;
+
+      for (const candidate of VIEWS) {
+        ui.viewElements[candidate.id].hidden = candidate.id !== activeView;
+      }
+      ui.configBanner.hidden = !view.showsConfigBanner;
+      for (const button of ui.navButtons) {
+        const current = button.dataset.view === activeView;
+        if (current) {
+          button.setAttribute('aria-current', 'page');
+        } else {
+          button.removeAttribute('aria-current');
+        }
+      }
+
+      // A canvas inside a display:none subtree has no measurable box, so
+      // Chart.js cannot lay it out until the view is actually in the layout.
+      // Charts are therefore created and measured on first reveal, and
+      // re-measured on every later reveal in case the window changed size.
+      rawChartRenderedVersion = -1;
+      scheduleRender(RENDER_CHART | RENDER_RAW_CHART | RENDER_ANALYTICS | RENDER_TABLE);
+      window.scrollTo(0, 0);
+    }
+
+    function resizeChart(chart) {
+      if (chart) chart.resize();
+    }
+
+    function applyNavAvailability() {
+      for (const button of ui.navButtons) {
+        const view = viewById(button.dataset.view);
+        const available = viewIsAvailable(view);
+        button.classList.toggle('unavailable', !available);
+        button.setAttribute('aria-disabled', String(!available));
+        const reason = available || view === null || view.requires === null
+          ? ''
+          : viewCapabilities[view.requires].reason;
+        if (reason) {
+          button.title = reason;
+          const label = button.querySelector('.nav-label')?.textContent || 'View';
+          button.setAttribute('aria-label', `${label}. Unavailable: ${reason}`);
+        } else {
+          button.removeAttribute('title');
+          button.removeAttribute('aria-label');
+        }
+      }
+
+      // The configuration can change under a view that is already open - a
+      // sensor switching to USB power invalidates VSTOR, for example. Fall
+      // back rather than leaving an empty section on screen.
+      if (!viewIsAvailable(viewById(activeView))) {
+        setActiveView(DEFAULT_VIEW, { force: true });
+      }
+    }
 
     // ---- Render scheduling -------------------------------------------------
     // Panning, scrubbing and a wheel gesture can each request many redraws per
@@ -2219,6 +2940,7 @@
     }
 
     function renderChart() {
+      if (activeView !== 'history') return;
       if (!historyChart) {
         if (typeof Chart !== 'undefined') initChart();
         if (!historyChart) {
@@ -2226,6 +2948,9 @@
           return;
         }
       }
+
+      // Re-measure on reveal: the canvas had no box while the view was hidden.
+      resizeChart(historyChart);
 
       const summary = historySummary();
       const bounds = summary.bounds;
@@ -2357,13 +3082,14 @@
     let rawChartRenderedVersion = -1;
 
     function renderRawStorageChart() {
-      // The section is hidden for every bare configuration. renderCapabilities
-      // reschedules this pass when it unhides the section.
-      if (ui.rawStorageSection.hidden) return;
+      // Skipped unless this view is on screen and the configuration supports
+      // it. setActiveView and renderCapabilities both reschedule the pass.
+      if (activeView !== 'storage' || ui.rawStorageSection.hidden) return;
       if (!rawStorageChart) {
         initRawStorageChart();
         if (!rawStorageChart) return;
       }
+      resizeChart(rawStorageChart);
       if (rawChartRenderedVersion === historyVersion) return;
 
       // Both series come from one pass instead of two filter+map pairs, and the
@@ -2481,6 +3207,29 @@
       if (powerWasHidden && !ui.powerSection.hidden) revealed |= RENDER_ANALYTICS;
       if (revealed !== 0) scheduleRender(revealed);
 
+      // Mirror the same capability decisions onto the navigation, with the
+      // specific reason each unavailable view is unavailable.
+      const detected = Boolean(latestStatus || latestLiveRecord);
+      viewCapabilities = {
+        storage: {
+          available: !ui.rawStorageSection.hidden,
+          reason: !detected
+            ? 'Connect to detect the sensor configuration.'
+            : config.bare
+              ? 'Needs the Logger HAT — this sensor is running bare.'
+              : 'No ambient or storage samples have been received yet.'
+        },
+        power: {
+          available: !ui.powerSection.hidden,
+          reason: !detected
+            ? 'Connect to detect the sensor configuration.'
+            : config.bare
+              ? 'Needs the Logger HAT — VSTOR is not observable on a bare XIAO.'
+              : 'No record carries a valid VSTOR reading yet.'
+        }
+      };
+      applyNavAvailability();
+
       ui.chartTitle.textContent = showHat
         ? 'Temperature and humidity history'
         : 'Temperature and VDD history';
@@ -2573,7 +3322,7 @@
         setConnectionState('idle', 'Disconnected');
         ui.liveCaption.textContent = 'Disconnected. Tap Reconnect to use the same bridge.';
       } else {
-        setConnectionState('error', `${ble.device.name || 'TempBridge'} disconnected`);
+        setConnectionState('error', `${ble.device.name || BRIDGE_FALLBACK_NAME} disconnected`);
         ui.liveCaption.textContent = 'Connection lost. Tap Reconnect to use the same bridge.';
         showError('The Bluetooth connection was lost. Move closer to the bridge and tap Reconnect.');
       }
@@ -2754,7 +3503,7 @@
       ble.connecting = true;
       ble.ready = false;
       const useExistingDevice = Boolean(ble.device && !ble.pickerOnNextAttempt);
-      setConnectionState('busy', useExistingDevice ? 'Reconnecting…' : 'Choose TempBridge…');
+      setConnectionState('busy', useExistingDevice ? 'Reconnecting…' : 'Choose HSC T+ Bridge…');
       updateButtonStates();
 
       try {
@@ -2781,7 +3530,7 @@
         }
 
         ble.ready = true;
-        setConnectionState('connected', `Connected to ${ble.device.name || 'TempBridge'}`);
+        setConnectionState('connected', `Connected to ${ble.device.name || BRIDGE_FALLBACK_NAME}`);
       } catch (error) {
         const detail = describeError(error);
         if (detail.includes('Protocol mismatch')) ble.protocolFailureMessage = detail;
@@ -2910,7 +3659,7 @@
         }
         if (activeSync === sync) activeSync = null;
         if (isConnected()) {
-          setConnectionState('connected', `Connected to ${ble.device.name || 'TempBridge'}`);
+          setConnectionState('connected', `Connected to ${ble.device.name || BRIDGE_FALLBACK_NAME}`);
         }
         updateButtonStates();
       }
@@ -2978,7 +3727,7 @@
         if (isConnected()) {
           setConnectionState(
             'connected',
-            `Connected to ${ble.device.name || 'TempBridge'}`
+            `Connected to ${ble.device.name || BRIDGE_FALLBACK_NAME}`
           );
         }
         updateButtonStates();
@@ -3018,7 +3767,7 @@
         const anchor = document.createElement('a');
         const stamp = new Date().toISOString().replaceAll(':', '-').replace(/\.\d{3}Z$/, 'Z');
         anchor.href = url;
-        anchor.download = `tempbridge-${stamp}.csv`;
+        anchor.download = `hsc-tplus-${stamp}.csv`;
         document.body.append(anchor);
         anchor.click();
         anchor.remove();
@@ -3636,7 +4385,14 @@
     function loadAnalyticsSettings() {
       const defaults = { capacitanceF: 1, regressionWindowMinutes: 45 };
       try {
-        const parsed = JSON.parse(localStorage.getItem(ANALYTICS_SETTINGS_KEY) || 'null');
+        let stored = localStorage.getItem(ANALYTICS_SETTINGS_KEY);
+        if (stored === null) {
+          // Settings saved under the previous product name are read once and
+          // then rewritten under the current key by migrateAnalyticsSettings().
+          stored = localStorage.getItem(LEGACY_ANALYTICS_SETTINGS_KEY);
+          analyticsSettingsNeedMigration = stored !== null;
+        }
+        const parsed = JSON.parse(stored || 'null');
         if (!parsed || !Number.isFinite(parsed.capacitanceF) || parsed.capacitanceF <= 0 ||
             !Number.isFinite(parsed.regressionWindowMinutes) || parsed.regressionWindowMinutes <= 0) {
           return defaults;
@@ -3653,8 +4409,10 @@
     function saveAnalyticsSettings() {
       try {
         localStorage.setItem(ANALYTICS_SETTINGS_KEY, JSON.stringify(analyticsSettings));
+        return true;
       } catch (_error) {
         // Storage can be disabled in privacy modes; calculations still work.
+        return false;
       }
     }
 
@@ -3845,9 +4603,11 @@
     }
 
     function renderAnalytics() {
-      // Hidden for every bare configuration and before the first STATUS.
-      // renderCapabilities reschedules this pass when it unhides the section.
-      if (ui.powerSection.hidden) return;
+      // Skipped unless this view is on screen and the configuration supports
+      // it. setActiveView and renderCapabilities both reschedule the pass.
+      if (activeView !== 'power' || ui.powerSection.hidden) return;
+      resizeChart(powerChart);
+      resizeChart(harvestChart);
 
       const { result, inference, harvestPoints, luxSlope, days } = analyticsPipeline();
       const hasVstorRecords = result.sourceSampleCount > 0;
@@ -3943,6 +4703,15 @@
       updateButtonStates();
     }
 
+    for (const button of ui.navButtons) {
+      button.addEventListener('click', () => setActiveView(button.dataset.view));
+    }
+    // Crossing the bottom-bar/side-rail breakpoint changes every chart's
+    // available width, so the visible one has to be measured again.
+    window.addEventListener('resize', () => {
+      scheduleRender(RENDER_CHART | RENDER_RAW_CHART | RENDER_ANALYTICS);
+    }, { passive: true });
+
     ui.connectButton.addEventListener('click', connect);
     ui.disconnectButton.addEventListener('click', disconnect);
     ui.syncButton.addEventListener('click', syncHistory);
@@ -3968,12 +4737,22 @@
     ui.capacitanceInput.value = String(analyticsSettings.capacitanceF);
     ui.regressionWindowInput.value = String(analyticsSettings.regressionWindowMinutes);
 
+    // Rewrite settings inherited from the previous product name under the
+    // current key, so the legacy key stops being consulted after one load.
+    if (analyticsSettingsNeedMigration && saveAnalyticsSettings()) {
+      try {
+        localStorage.removeItem(LEGACY_ANALYTICS_SETTINGS_KEY);
+      } catch (_error) {
+        // Storage can be read-only in privacy modes; the values still loaded.
+      }
+    }
+
     // Console-callable pure checks for protocol math development and release QA.
     window.protocolSelfTest = protocolSelfTest;
     window.chartNavigationSelfTest = chartNavigationSelfTest;
     window.powerMathSelfTest = powerMathSelfTest;
     window.inferenceMathSelfTest = inferenceMathSelfTest;
-    window.tempBridgeSelfTest = () => {
+    window.hscSensorSelfTest = () => {
       // Renders are coalesced into animation frames, so settle any pending one
       // before reporting: release QA should never read a half-applied UI.
       flushRenderNow();
@@ -3984,6 +4763,8 @@
         inference: inferenceMathSelfTest()
       });
     };
+    // Retained so the name documented for earlier releases still works.
+    window.tempBridgeSelfTest = window.hscSensorSelfTest;
 
     // Chart.js can arrive after this script when the same-origin copy is absent
     // and the pinned CDN build is fetched instead. Clear the "did not load"
@@ -4003,7 +4784,11 @@
       scheduleRender(RENDER_EVERYTHING);
     };
 
-    initChart();
+    // Charts are built on first reveal, not here: a canvas inside a hidden
+    // view has no measurable box for Chart.js to size against.
+    setActiveView(DEFAULT_VIEW, { force: true });
+    // Blur the hardware-gated entries on first paint rather than a frame later.
+    applyNavAvailability();
     renderHistory();
     resetStatusDisplay();
     detectBluetoothSupport();
