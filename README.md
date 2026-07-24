@@ -21,5 +21,9 @@ configuration, displays the sensor's reported cadence, and enables only the
 measurements and power analysis supported by that configuration. The bridge
 and page accept arbitrary sensor cadences without source changes.
 
+The **Reference** view includes a persistent Dark/Light theme switch and a
+Bluetooth-free demo with 24 hours of full HAT + BQ25570 sample data. Demo data
+is kept separate from real measurements and is removed when the demo ends.
+
 The page talks directly to the bridge over BLE; GitHub only hosts the static
 HTML and does not receive the sensor measurements.

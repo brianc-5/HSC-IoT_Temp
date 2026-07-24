@@ -4,12 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1a">
-  <meta name="color-scheme" content="dark">
-  <meta name="description" content="HSC T+ Sensor — Web Bluetooth client for the Protocol v3 bridge: live samples, retained history, CSV export, and harvested-power analysis.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="HSC T+ Sensor: a phone-friendly dashboard for a solar-powered environmental sensor with live readings, measurement history, CSV export, and solar energy analysis.">
   <title>HSC T+ Sensor</title>
 
   <!-- Production hosting: GitHub Pages or another HTTPS static host. -->
   <!-- Local fallback: python3 -m http.server 8000, optionally with adb reverse tcp:8000 tcp:8000. -->
+
+  <!-- Apply the saved theme before first paint to prevent a bright flash when
+       opening a page that was previously set to light mode. Dark remains the
+       default for existing users and for browsers with storage disabled. -->
+  <script>
+    try {
+      if (localStorage.getItem('hsc-tplus.theme') === 'light') {
+        document.documentElement.dataset.theme = 'light';
+      }
+    } catch (_error) {
+      // Theme selection still works for this visit when storage is unavailable.
+    }
+  </script>
 
   <!-- Chart.js loads same-origin first (offline-capable, no third-party
        handshake). Only if that file is absent does the SRI-pinned CDN copy
@@ -32,7 +45,57 @@
       --danger: #ff7b86;
       --warning: #ffcc66;
       --shadow: 0 18px 55px rgb(0 0 0 / 0.28);
+      --body-glow-1: rgb(68 215 182 / 0.14);
+      --body-glow-2: rgb(101 169 255 / 0.09);
+      --nav-bg: rgb(15 23 38 / 0.86);
+      --nav-rail-bg: rgb(12 19 31 / 0.72);
+      --toast-bg: rgb(8 12 20 / 0.94);
+      --card-start: rgb(21 31 49 / 0.96);
+      --card-end: rgb(12 19 31 / 0.96);
+      --inset-bg: rgb(8 12 20 / 0.35);
+      --inset-bg-strong: rgb(8 12 20 / 0.5);
+      --body-copy: #cbd6e6;
+      --notice-copy: #ffe0a0;
+      --danger-copy: #ffc0c5;
+      --analysis-copy: #cfe2ff;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f3f6fa;
+      --surface: #ffffff;
+      --surface-2: #eaf0f6;
+      --border: #c9d4e1;
+      --text: #132033;
+      --muted: #56667a;
+      --accent: #087f68;
+      --accent-strong: #066b58;
+      --blue: #1d5fb8;
+      --danger: #b42335;
+      --warning: #8a5700;
+      --shadow: 0 16px 40px rgb(47 66 91 / 0.13);
+      --body-glow-1: rgb(8 127 104 / 0.1);
+      --body-glow-2: rgb(29 95 184 / 0.08);
+      --nav-bg: rgb(255 255 255 / 0.9);
+      --nav-rail-bg: rgb(247 250 253 / 0.92);
+      --toast-bg: rgb(255 255 255 / 0.97);
+      --card-start: rgb(255 255 255 / 0.99);
+      --card-end: rgb(246 249 252 / 0.99);
+      --inset-bg: rgb(218 228 239 / 0.48);
+      --inset-bg-strong: rgb(218 228 239 / 0.7);
+      --body-copy: #35455a;
+      --notice-copy: #714500;
+      --danger-copy: #8f1d2b;
+      --analysis-copy: #234d7d;
+    }
+
+    :root[data-theme="light"] .app-nav {
+      box-shadow: 0 12px 32px rgb(47 66 91 / 0.16);
+    }
+
+    :root[data-theme="light"] .nav-feedback {
+      box-shadow: 0 8px 24px rgb(47 66 91 / 0.14);
     }
 
     * {
@@ -44,8 +107,8 @@
       min-height: 100vh;
       margin: 0;
       background:
-        radial-gradient(circle at 15% -10%, rgb(68 215 182 / 0.14), transparent 33rem),
-        radial-gradient(circle at 95% 10%, rgb(101 169 255 / 0.09), transparent 28rem),
+        radial-gradient(circle at 15% -10%, var(--body-glow-1), transparent 33rem),
+        radial-gradient(circle at 95% 10%, var(--body-glow-2), transparent 28rem),
         var(--bg);
       color: var(--text);
     }
@@ -99,7 +162,7 @@
       padding: 6px;
       border: 1px solid var(--border);
       border-radius: 20px;
-      background: rgb(15 23 38 / 0.86);
+      background: var(--nav-bg);
       box-shadow: 0 12px 40px rgb(0 0 0 / 0.45);
       -webkit-backdrop-filter: blur(16px);
       backdrop-filter: blur(16px);
@@ -183,7 +246,7 @@
       padding: 10px 13px;
       border: 1px solid rgb(101 169 255 / 0.34);
       border-radius: 11px;
-      background: rgb(8 12 20 / 0.94);
+      background: var(--toast-bg);
       box-shadow: 0 8px 28px rgb(0 0 0 / 0.38);
       color: var(--text);
       font-size: 0.78rem;
@@ -205,7 +268,7 @@
         border: 0;
         border-right: 1px solid var(--border);
         border-radius: 0;
-        background: rgb(12 19 31 / 0.72);
+        background: var(--nav-rail-bg);
         box-shadow: none;
       }
 
@@ -269,7 +332,7 @@
 
     .reference-card p,
     .reference-card li {
-      color: #cbd6e6;
+      color: var(--body-copy);
       font-size: 0.88rem;
       line-height: 1.65;
     }
@@ -298,7 +361,7 @@
       padding: 13px 15px;
       border: 1px solid rgb(101 169 255 / 0.26);
       border-radius: 11px;
-      background: rgb(8 12 20 / 0.5);
+      background: var(--inset-bg-strong);
       color: var(--accent-strong);
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
       font-size: 0.85rem;
@@ -324,9 +387,9 @@
 
     .pipeline-stage {
       padding: 14px;
-      border: 1px solid rgb(38 52 75 / 0.8);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      background: rgb(8 12 20 / 0.4);
+      background: var(--inset-bg);
     }
 
     .pipeline-stage span {
@@ -371,10 +434,113 @@
       font-size: 0.85rem;
     }
 
+    .reference-card a,
+    .credits a,
+    .view-heading a {
+      color: var(--blue);
+      text-decoration-color: rgb(101 169 255 / 0.5);
+    }
+
+    .credits a strong {
+      color: inherit;
+    }
+
     .credits hr {
       margin: 16px 0;
       border: 0;
       border-top: 1px solid rgb(68 215 182 / 0.2);
+    }
+
+    .reference-tools {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 18px;
+      padding: 18px;
+    }
+
+    .reference-tool {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .reference-tool + .reference-tool {
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .reference-tool strong,
+    .reference-tool span {
+      display: block;
+    }
+
+    .reference-tool strong {
+      margin-bottom: 4px;
+      font-size: 0.92rem;
+    }
+
+    .reference-tool span {
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .switch-control {
+      display: inline-flex;
+      min-width: 142px;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 8px 11px;
+      border-radius: 999px;
+    }
+
+    .switch-track {
+      position: relative;
+      width: 38px;
+      height: 22px;
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--inset-bg);
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .switch-track::after {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--muted);
+      content: "";
+      transition: transform 140ms ease, background 140ms ease;
+    }
+
+    .switch-control[aria-checked="true"] {
+      border-color: rgb(68 215 182 / 0.58);
+      background: rgb(68 215 182 / 0.12);
+      color: var(--accent-strong);
+    }
+
+    .switch-control[aria-checked="true"] .switch-track {
+      border-color: var(--accent);
+      background: rgb(68 215 182 / 0.2);
+    }
+
+    .switch-control[aria-checked="true"] .switch-track::after {
+      background: var(--accent-strong);
+      transform: translateX(16px);
+    }
+
+    .simulation-note {
+      margin-top: 2px;
+      color: var(--accent-strong) !important;
+      font-weight: 600;
     }
 
     .reference-table th,
@@ -471,7 +637,7 @@
       padding: 9px 12px;
       border: 1px solid rgb(68 215 182 / 0.22);
       border-radius: 999px;
-      background: rgb(8 12 20 / 0.32);
+      background: var(--inset-bg);
       color: var(--text) !important;
       text-align: center;
       font-variant-numeric: tabular-nums;
@@ -518,7 +684,7 @@
       overflow: hidden;
       border: 1px solid var(--border);
       border-radius: 18px;
-      background: linear-gradient(145deg, rgb(21 31 49 / 0.96), rgb(12 19 31 / 0.96));
+      background: linear-gradient(145deg, var(--card-start), var(--card-end));
       box-shadow: var(--shadow);
       /* Each card already clips its own content, so scoping layout/paint work
          to the card keeps a table or chart rebuild off the rest of the page. */
@@ -566,9 +732,9 @@
     .metric {
       min-width: 0;
       padding: 12px;
-      border: 1px solid rgb(38 52 75 / 0.75);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      background: rgb(8 12 20 / 0.35);
+      background: var(--inset-bg);
     }
 
     .metric-label {
@@ -671,7 +837,7 @@
       min-width: 0;
       padding: 11px 9px;
       border-radius: 11px;
-      background: rgb(8 12 20 / 0.38);
+      background: var(--inset-bg);
       text-align: center;
     }
 
@@ -715,13 +881,13 @@
     .notice {
       border-color: rgb(255 204 102 / 0.4);
       background: rgb(255 204 102 / 0.08);
-      color: #ffe0a0;
+      color: var(--notice-copy);
     }
 
     .error-message {
       border-color: rgb(255 123 134 / 0.42);
       background: rgb(255 123 134 / 0.08);
-      color: #ffc0c5;
+      color: var(--danger-copy);
     }
 
     .history-card {
@@ -735,7 +901,7 @@
       border: 1px solid rgb(101 169 255 / 0.3);
       border-radius: 11px;
       background: rgb(101 169 255 / 0.07);
-      color: #cfe2ff;
+      color: var(--analysis-copy);
       font-size: 0.84rem;
       line-height: 1.5;
     }
@@ -765,9 +931,9 @@
     .candidate {
       min-width: 0;
       padding: 12px;
-      border: 1px solid rgb(38 52 75 / 0.75);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      background: rgb(8 12 20 / 0.35);
+      background: var(--inset-bg);
     }
 
     .setting label,
@@ -970,7 +1136,7 @@
     th,
     td {
       padding: 12px 16px;
-      border-bottom: 1px solid rgb(38 52 75 / 0.58);
+      border-bottom: 1px solid var(--border);
       text-align: right;
       white-space: nowrap;
     }
@@ -1070,6 +1236,15 @@
       .credits {
         padding: 18px;
       }
+
+      .reference-tool {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .switch-control {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -1089,13 +1264,13 @@
     <section id="configBanner" class="config-banner" aria-label="Detected sensor configuration" aria-live="polite">
       <div>
         <strong id="configurationName">Configuration unknown</strong>
-        <span id="configurationDetail">Connect to a Protocol v3 bridge to detect the sensor hardware and power source automatically.</span>
+        <span id="configurationDetail">Connect to the receiver to detect the sensor hardware and power source automatically.</span>
       </div>
       <span id="configurationCadence" class="cadence-badge">Interval unknown</span>
     </section>
 
     <div id="view-live" class="view">
-    <section class="grid" aria-label="Current reading and bridge controls">
+    <section class="grid" aria-label="Current reading and receiver controls">
       <article class="card live-card">
         <h2 id="temperatureHeading">Current temperature</h2>
         <div class="temperature"><span id="temperatureValue">--.--</span><span class="unit">°C</span></div>
@@ -1110,7 +1285,7 @@
             <span id="humidityValue" class="metric-value">—</span>
           </div>
           <div id="luxMetric" class="metric hat-field" hidden>
-            <span class="metric-label">Illuminance</span>
+            <span class="metric-label">Light level</span>
             <span id="luxValue" class="metric-value">—</span>
           </div>
           <div class="metric">
@@ -1118,7 +1293,7 @@
             <span id="sequenceValue" class="metric-value">—</span>
           </div>
           <div class="metric">
-            <span class="metric-label">RSSI</span>
+            <span class="metric-label">Signal</span>
             <span id="rssiValue" class="metric-value">—</span>
           </div>
         </div>
@@ -1138,16 +1313,16 @@
         </article>
 
         <article class="card status-card">
-          <h2>Bridge status</h2>
+          <h2>Receiver status</h2>
           <div class="status-grid">
-            <div class="status-item"><strong id="statusRecords">—</strong><span>Records</span></div>
+            <div class="status-item"><strong id="statusRecords">—</strong><span>Readings</span></div>
             <div class="status-item"><strong id="statusAge">—</strong><span>Last age</span></div>
-            <div class="status-item"><strong id="statusRssi">—</strong><span>Last RSSI</span></div>
+            <div class="status-item"><strong id="statusRssi">—</strong><span>Signal</span></div>
             <div class="status-item"><strong id="statusClock">—</strong><span>Clock</span></div>
             <div class="status-item"><strong id="statusFirmware">—</strong><span>Firmware</span></div>
-            <div class="status-item"><strong id="statusConfiguration">—</strong><span>Configuration</span></div>
+            <div class="status-item"><strong id="statusConfiguration">—</strong><span>Setup</span></div>
             <div class="status-item"><strong id="statusInterval">—</strong><span>Sample interval</span></div>
-            <div class="status-item"><strong id="statusRetention">—</strong><span>4096-record span</span></div>
+            <div class="status-item"><strong id="statusRetention">—</strong><span>History span</span></div>
           </div>
         </article>
       </div>
@@ -1189,12 +1364,12 @@
     <div id="view-storage" class="view" hidden>
     <section id="rawStorageSection" class="card history-card" aria-labelledby="rawStorageTitle" hidden>
       <div class="section-heading">
-        <h2 id="rawStorageTitle">Raw VSTOR and illuminance history</h2>
-        <span class="record-count">VSTOR-valid samples only</span>
+        <h2 id="rawStorageTitle">Stored voltage and light history</h2>
+        <span class="record-count">Valid readings only</span>
       </div>
       <div class="chart-wrap">
-        <canvas id="rawStorageChart" aria-label="Raw VSTOR and illuminance history chart"></canvas>
-        <p id="rawChartFallback" class="chart-fallback">No timestamped HAT samples are available.</p>
+        <canvas id="rawStorageChart" aria-label="Stored voltage and light history chart"></canvas>
+        <p id="rawChartFallback" class="chart-fallback">No timestamped sensor-board readings are available yet.</p>
       </div>
     </section>
     </div>
@@ -1202,10 +1377,10 @@
     <div id="view-power" class="view" hidden>
     <section id="powerSection" class="card history-card" aria-labelledby="powerTitle" hidden>
       <div class="section-heading">
-        <h2 id="powerTitle" class="estimated-label">Estimated panel harvest into VSTOR</h2>
-        <span class="record-count">Experimental constant-drain inference</span>
+        <h2 id="powerTitle" class="estimated-label">Estimated solar energy collected</h2>
+        <span class="record-count">Experimental estimate</span>
       </div>
-      <p id="powerAvailability" class="analysis-note">Storage-power analysis is not available for this configuration.</p>
+      <p id="powerAvailability" class="analysis-note">Solar energy analysis is not available for this sensor setup.</p>
 
       <div class="settings-grid" aria-label="Power calculation settings">
         <div class="setting">
@@ -1227,29 +1402,29 @@
         <div class="summary-item"><span>Median spacing</span><strong id="medianSpacing">—</strong></div>
       </div>
 
-      <h3 class="subsection-heading">Measured intermediary · Net storage power</h3>
+      <h3 class="subsection-heading">Net power into storage</h3>
       <div class="chart-wrap compact-chart">
-        <canvas id="powerChart" aria-label="Net storage power history chart"></canvas>
-        <p id="powerChartFallback" class="chart-fallback">Not enough valid VSTOR history for a regression.</p>
+        <canvas id="powerChart" aria-label="Net power into storage history chart"></canvas>
+        <p id="powerChartFallback" class="chart-fallback">Not enough valid voltage history yet.</p>
       </div>
 
-      <h3 class="subsection-heading">Automatic low-light drain baseline</h3>
-      <p id="inferenceSummary" class="analysis-note">Collect dark data to estimate the constant storage-plane drain automatically.</p>
+      <h3 class="subsection-heading">Power use in darkness</h3>
+      <p id="inferenceSummary" class="analysis-note">Collect overnight data to estimate how much power the system itself uses.</p>
       <div id="candidateGrid" class="candidate-grid" aria-label="Low-light baseline candidates"></div>
 
       <div class="summary-grid">
-        <div class="summary-item"><span>Estimated dark drain / usage</span><strong id="estimatedDrain">—</strong></div>
+        <div class="summary-item"><span>Power use in darkness</span><strong id="estimatedDrain">—</strong></div>
         <div class="summary-item"><span>Accepted band</span><strong id="acceptedBand">—</strong></div>
         <div class="summary-item"><span>Confidence / coverage</span><strong id="inferenceConfidence">—</strong></div>
-        <div class="summary-item"><span>Harvest–lux slope</span><strong id="harvestLuxSlope">—</strong></div>
+        <div class="summary-item"><span>Harvest per unit of light</span><strong id="harvestLuxSlope">—</strong></div>
       </div>
 
       <div class="chart-wrap compact-chart">
-        <canvas id="harvestChart" aria-label="Estimated panel harvest into VSTOR chart"></canvas>
-        <p id="harvestChartFallback" class="chart-fallback">A stable low-light baseline is required before harvest can be estimated.</p>
+        <canvas id="harvestChart" aria-label="Estimated solar harvest chart"></canvas>
+        <p id="harvestChartFallback" class="chart-fallback">A stable darkness baseline is needed before solar harvest can be estimated.</p>
       </div>
 
-      <h3 class="subsection-heading">Estimated daily energy from available coverage</h3>
+      <h3 class="subsection-heading">Estimated daily energy</h3>
       <div class="table-wrap">
         <table>
           <thead>
@@ -1280,12 +1455,12 @@
             <tr>
               <th scope="col">Time</th>
               <th scope="col">Seq</th>
-              <th scope="col">Configuration</th>
+              <th scope="col">Setup</th>
               <th scope="col">Temperature</th>
               <th scope="col">Voltage</th>
-              <th class="hat-column" scope="col" hidden>Lux</th>
+              <th class="hat-column" scope="col" hidden>Light</th>
               <th class="hat-column" scope="col" hidden>Humidity</th>
-              <th scope="col">RSSI</th>
+              <th scope="col">Signal</th>
             </tr>
           </thead>
           <tbody id="historyBody">
@@ -1299,207 +1474,234 @@
     <div id="view-reference" class="view" hidden>
       <div class="view-heading">
         <h2>Reference</h2>
-        <p>The measurement chain, the estimators behind every number this page
-          reports, and their stated limits.</p>
+        <p>How the system works, how every number on this page is calculated,
+          and the limits of each estimate. Built for the
+          <a href="https://research.tuni.fi/hsc/" target="_blank" rel="noopener">Hybrid Solar Cells (HSC) research group</a>
+          at Tampere University.</p>
       </div>
 
+      <section class="card reference-tools" aria-label="Display and demonstration options">
+        <div class="reference-tool">
+          <div>
+            <strong>Appearance</strong>
+            <span>Switch between the original dark display and a brighter light display.</span>
+          </div>
+          <button id="themeToggle" class="switch-control" type="button" role="switch"
+                  aria-checked="false" aria-label="Use light mode">
+            <span class="switch-track" aria-hidden="true"></span>
+            <span id="themeToggleText">Dark mode</span>
+          </button>
+        </div>
+        <div class="reference-tool">
+          <div>
+            <strong>Explore with sample data</strong>
+            <span>Loads 24 hours of realistic example readings from the complete
+              sensor board with the BQ25570 energy-harvesting circuit. No
+              Bluetooth device is required, and your existing readings are
+              restored when the demo ends.</span>
+            <span id="simulationStatus" class="simulation-note" role="status"
+                  aria-live="polite">Demo is off.</span>
+          </div>
+          <button id="simulationToggle" class="switch-control" type="button" role="switch"
+                  aria-checked="false" aria-label="Start sample-data demo">
+            <span class="switch-track" aria-hidden="true"></span>
+            <span id="simulationToggleText">Start demo</span>
+          </button>
+        </div>
+      </section>
+
       <article class="card reference-card">
-        <h2>System architecture</h2>
-        <p>Three independent devices, each with a single responsibility. The
-          binary contract between them is frozen at Protocol v3, so any stage
-          can be rebuilt without touching the others.</p>
+        <h2>How the system works</h2>
+        <p>Three independent parts, each with one job. They talk to each other
+          in a fixed, well-defined way, so any part can be improved without
+          breaking the others.</p>
 
         <div class="pipeline">
           <div class="pipeline-stage">
             <span>Stage 1 · Sensor</span>
-            <strong>XIAO nRF52840 (Zephyr)</strong>
-            <small>Wakes on a configured cadence, powers the Logger HAT rail only
-              for the measurement, reads ambient temperature and humidity
-              (SHT40), illuminance (BH1750) and the VSTOR divider, then
-              broadcasts one BTHome v2 advertisement burst and sleeps. It detects
-              its own hardware and power source and reports both on air, so no
-              mode is ever selected by hand.</small>
+            <strong>Solar-powered sensor</strong>
+            <small>A small, low-power device that wakes at a set interval,
+              measures temperature, humidity, light level and the voltage of its
+              energy store, broadcasts one short radio message, and goes back to
+              sleep. It detects its own hardware and power source automatically,
+              so nothing ever needs to be configured by hand.</small>
           </div>
           <div class="pipeline-stage">
-            <span>Stage 2 · Bridge</span>
-            <strong>XIAO nRF52840 (USB powered)</strong>
-            <small>Scans continuously for the commissioned sensor address,
-              rejects duplicate and implausible frames, maintains an extended
-              sequence number and a wrap-safe clock, and appends every accepted
-              sample to a CRC-protected QSPI log that retains the newest 4,096
-              records across power loss. It serves them over GATT while still
-              scanning.</small>
+            <span>Stage 2 · Receiver</span>
+            <strong>USB-powered receiver</strong>
+            <small>Listens continuously for the sensor's broadcasts, filters out
+              duplicate or implausible readings, keeps accurate time, and safely
+              stores the newest 4,096 readings in memory that survives power
+              loss. It shares them with your phone over Bluetooth while it keeps
+              listening.</small>
           </div>
           <div class="pipeline-stage">
             <span>Stage 3 · This page</span>
-            <strong>Web Bluetooth client</strong>
-            <small>Validates the 16-byte STATUS before parsing anything, sets the
-              bridge clock, streams history, and derives every chart and
-              estimate below in the browser. Measurements never leave the phone:
-              the static host serves only the application files.</small>
+            <strong>Web app</strong>
+            <small>Connects to the receiver over Bluetooth, checks that the two
+              are compatible, sets the receiver's clock, downloads the stored
+              readings, and calculates every chart and estimate right here in
+              your browser. Your measurements never leave your phone.</small>
           </div>
         </div>
 
-        <h3>Record and retention model</h3>
-        <p>Each record is exactly 16 bytes: epoch seconds, extended sequence,
-          temperature, voltage, illuminance, humidity, RSSI and a flag byte. The
-          flag byte carries the configuration ID, whether the voltage is a valid
-          VSTOR reading, and whether the temperature is ambient or MCU die.
-          Unavailable fields use explicit sentinels rather than zero, so a failed
-          sensor never fabricates a measurement.</p>
-        <p>The bridge retains 4,096 records. Coverage is simply
-          <strong>4096 × sample interval</strong>: about 22.8 hours at a
-          20-second cadence, or about 8.5 days at 180 seconds.</p>
+        <h3>What each reading contains</h3>
+        <p>Every reading stores the time it was taken, a sequence number,
+          temperature, voltage, light level, humidity, radio signal strength,
+          and a short description of the sensor's setup. If a measurement could
+          not be taken, it is marked as unavailable rather than recorded as
+          zero, so a failed sensor never invents a value.</p>
+        <p>The receiver keeps the newest 4,096 readings, so its history spans
+          <strong>4096 × sample interval</strong>: about 22.8 hours when
+          sampling every 20 seconds, or about 8.5 days when sampling every
+          3 minutes.</p>
 
-        <h3>Time and identity</h3>
-        <p>The bridge stores uptime until a phone writes the epoch, then
-          normalises earlier current-boot records through a separate CRC-checked
-          patch log. Records recovered from an earlier boot that were never
-          patched keep epoch zero rather than being reinterpreted with a later
-          offset — an unknown timestamp is reported as unknown.</p>
-        <p>This page keys held records on epoch plus sequence, so a 16-bit
-          sequence wrap cannot overwrite older data, and re-syncing is
-          idempotent.</p>
+        <h3>Time-keeping</h3>
+        <p>The receiver only counts time since it was switched on until a phone
+          connects and sets its clock; earlier readings from the current session
+          are then corrected to real time. Readings whose true time can no
+          longer be established are reported as having an unknown time rather
+          than being given a guessed one.</p>
+        <p>Each reading is identified by its time and sequence number, so
+          downloading the history again never duplicates or overwrites older
+          data.</p>
       </article>
 
       <article class="card reference-card">
-        <h2>Mathematical models</h2>
+        <h2>The maths behind the numbers</h2>
         <p>Everything in the Power view is an estimate built on a stated
-          assumption. Each model below names the assumption it depends on and
-          the condition under which it refuses to produce a number.</p>
+          assumption. Each model below explains in plain terms what it assumes,
+          and when it refuses to produce a number rather than show a misleading
+          one.</p>
 
-        <h3>1 · Net storage power</h3>
-        <p>The supercapacitor is an energy store, so the power crossing its
-          terminals is the time derivative of its stored energy
-          <em>E</em> = ½·C·V²:</p>
+        <h3>1 · Net power into storage</h3>
+        <p>The sensor stores its energy in a supercapacitor, a small
+          rechargeable energy store. The power flowing in or out of it follows
+          from its stored energy <em>E</em> = ½·C·V²:</p>
         <div class="formula">P_net(t) = C · V(t) · dV/dt<span class="annot">C  = storage capacitance (F, your setting)
-V  = VSTOR at the sample (V)
+V  = stored energy voltage at the sample (V)
 Positive P_net means the store is charging; negative means it is draining.</span></div>
-        <p>The derivative is not a finite difference between adjacent samples,
-          which would amplify ADC noise. It is the slope of an ordinary
-          least-squares fit over a trailing window, computed in mean-centred
-          form for numerical stability:</p>
+        <p>Comparing just two neighbouring samples would amplify measurement
+          noise. The rate of change is instead taken as the slope of a
+          least-squares line fitted over a trailing window of samples:</p>
         <div class="formula">dV/dt = Σ(tᵢ − t̄)(Vᵢ − V̄) ⁄ Σ(tᵢ − t̄)²<span class="annot">Window = your trailing window setting, default 45 min.
-Spacing comes from the record timestamps themselves, never from a nominal cadence.</span></div>
+Spacing comes from the actual reading timestamps, never from an assumed interval.</span></div>
         <p><strong>Refuses to produce a value when:</strong> the window holds
-          fewer than 6 valid samples, or any gap inside it exceeds three times
-          the measured median spacing. A regression spanning an outage would
-          otherwise report a slope across data that does not exist.</p>
-        <p><strong>Eligibility:</strong> only records whose flag bit marks the
-          voltage as valid VSTOR participate. Regulated VDD readings and
-          out-of-band values are excluded, never rescaled.</p>
+          fewer than 6 valid samples, or there is a large gap inside it. A fit
+          spanning an outage would otherwise report a trend across data that
+          does not exist.</p>
+        <p><strong>Which readings count:</strong> only readings with a valid
+          storage-voltage measurement are used. Readings taken while on USB
+          power, and implausible values, are excluded rather than rescaled.</p>
 
-        <h3>2 · Dark drain baseline</h3>
-        <p>Harvest cannot be separated from consumption by measuring VSTOR
-          alone — the store only ever shows the net of the two. In darkness,
-          however, harvest is zero, so whatever the store loses is the system's
-          own drain:</p>
-        <div class="formula">P_drain ≈ median( −P_net )<span class="annot">…over every estimate whose illuminance is below a lux threshold.
-Median, not mean, so a few contaminated samples cannot drag the baseline.</span></div>
-        <p>The difficulty is choosing the threshold. Too high and residual
-          daylight leaks in, understating the drain; too low and there is not
-          enough data. Rather than fixing one, the page evaluates three
-          cumulative bands — below 1, 3 and 5 lux — and tests whether adjacent
-          bands agree:</p>
-        <div class="formula">|D_high − D_low| ≤ max(5 µW, 20 % · D_low)<span class="annot">D_low, D_high = drain estimated from the lower and upper band of an
-adjacent pair. If it holds, the lower band is accepted.
-Agreement between two differently contaminated bands is evidence
-that neither is contaminated.</span></div>
-        <p>Each candidate band needs at least 30 net-power estimates spanning a
-          full regression window. Confidence is reported as High, Moderate or
-          Low from how much supporting coverage the neighbouring band has.</p>
-        <p><strong>Refuses to produce a value when:</strong> no adjacent pair
-          agrees, or the stable estimate is non-positive. A non-positive dark
-          drain contradicts the constant-drain premise, so the page reports the
-          baseline as unavailable rather than substituting zero — which would
-          silently turn every net-power reading into a harvest figure.</p>
+        <h3>2 · Power use in darkness</h3>
+        <p>The energy store only ever shows the <em>net</em> of solar energy
+          coming in and the sensor's own consumption going out. In darkness,
+          however, no solar energy comes in, so whatever the store loses is the
+          system's own consumption:</p>
+        <div class="formula">P_drain ≈ median( −P_net )<span class="annot">…over every estimate taken when the measured light level was below a threshold.
+The median is used, not the mean, so a few odd samples cannot skew the result.</span></div>
+        <p>The difficulty is choosing what counts as "dark". Too generous and
+          residual daylight leaks in; too strict and there is not enough data.
+          Rather than fixing one threshold, the page evaluates three (below 1,
+          3 and 5 lux) and checks whether neighbouring thresholds agree:</p>
+        <div class="formula">|D_high − D_low| ≤ max(5 µW, 20 % · D_low)<span class="annot">D_low, D_high = consumption estimated with the stricter and the looser
+threshold of a neighbouring pair. If they agree, the stricter one is accepted.
+Agreement between two differently chosen thresholds is good evidence
+that neither is affected by stray light.</span></div>
+        <p>Each candidate threshold needs at least 30 estimates spanning a full
+          analysis window. Confidence is reported as High, Moderate or Low
+          depending on how much supporting data the neighbouring threshold
+          has.</p>
+        <p><strong>Refuses to produce a value when:</strong> no neighbouring
+          pair agrees, or the estimate comes out at or below zero, which would
+          contradict the assumption that the sensor always consumes some power.
+          In that case the page reports the baseline as unavailable rather than
+          silently substituting zero.</p>
 
-        <h3>3 · Harvested power into storage</h3>
-        <p>With a drain baseline accepted, harvest is the net rate plus what the
-          system was consuming at the same time:</p>
-        <div class="formula">P_harvest = max(0, P_net + P_drain)<span class="annot">The clamp encodes a physical fact: a photovoltaic cell cannot deliver negative power.</span></div>
-        <p><strong>Assumption:</strong> the storage-plane drain is approximately
-          constant across light and dark. This is the weakest link in the chain
-          and the reason every harvest figure on this page is labelled
+        <h3>3 · Solar energy collected</h3>
+        <p>Once the darkness baseline is accepted, the solar energy collected is
+          the net rate plus what the system was consuming at the same time:</p>
+        <div class="formula">P_harvest = max(0, P_net + P_drain)<span class="annot">The lower limit of zero encodes a physical fact: a solar cell cannot deliver negative power.</span></div>
+        <p><strong>Assumption:</strong> the system consumes roughly the same
+          power in light and in darkness. This is the weakest link in the chain,
+          and the reason every solar figure on this page is labelled
           estimated.</p>
-        <p><strong>Boundary:</strong> this is power delivered <em>into</em>
-          VSTOR. It is not raw panel-terminal power, and no buck-converter
-          efficiency is applied in either direction.</p>
+        <p><strong>What it measures:</strong> the power actually delivered
+          <em>into</em> the energy store, not the raw output at the solar
+          cell's terminals, since some power is lost along the way.</p>
 
-        <h3>4 · Harvest–illuminance response</h3>
+        <h3>4 · How harvest responds to light</h3>
         <p>A least-squares fit constrained through the origin, since zero light
           must give zero harvest:</p>
-        <div class="formula">k = Σ(Eᵢ · Pᵢ) ⁄ Σ(Eᵢ²)      [µW per lux]<span class="annot">E = illuminance (lux), P = estimated harvest (µW).
-A single-slope summary of the cell's indoor response, not a calibration.</span></div>
+        <div class="formula">k = Σ(Eᵢ · Pᵢ) ⁄ Σ(Eᵢ²)      [µW per lux]<span class="annot">E = light level (lux), P = estimated harvest (µW).
+A single-number summary of the cell's indoor response, not a calibration.</span></div>
 
         <h3>5 · Daily energy</h3>
-        <p>Trapezoidal integration of the harvest series, split at local
-          midnight so a segment crossing the boundary is apportioned by linear
-          interpolation between its endpoints:</p>
-        <div class="formula">E = Σ ½·(Pᵢ + Pᵢ₊₁)·(tᵢ₊₁ − tᵢ)<span class="annot">Reported in mWh or µWh. Intervals longer than three times the median spacing are dropped, not bridged.</span></div>
-        <p>Each day reports its own coverage. A day is marked complete only
-          above 95 % coverage; anything else is labelled a partial day, so a
-          gap can never masquerade as a low-energy day.</p>
+        <p>The estimated power is summed over time (trapezoidal integration),
+          split at local midnight so each calendar day gets its fair share:</p>
+        <div class="formula">E = Σ ½·(Pᵢ + Pᵢ₊₁)·(tᵢ₊₁ − tᵢ)<span class="annot">Reported in mWh or µWh. Long gaps in the data are skipped, not bridged.</span></div>
+        <p>Each day reports its own coverage. A day is marked complete only when
+          more than 95 % of it is covered by data; anything else is labelled a
+          partial day, so a gap can never masquerade as a low-energy day.</p>
 
-        <h3>6 · Chart gap handling</h3>
-        <p>Chart lines break rather than interpolate across an interval longer
-          than <strong>max(5 min, 3.5 × cadence)</strong>. A straight line drawn
-          through a bridge or sensor outage would imply measurements that were
-          never taken.</p>
+        <h3>6 · Gaps in the charts</h3>
+        <p>Chart lines break rather than draw straight across a long gap
+          (anything longer than <strong>max(5 min, 3.5 × sample
+          interval)</strong>). A line drawn through an outage would imply
+          measurements that were never taken.</p>
       </article>
 
       <article class="card reference-card">
-        <h2>Reading the configuration badge</h2>
+        <h2>What the setup badge means</h2>
         <p>The sensor reports what hardware it found and how it is powered. This
-          page enables only what that configuration can actually support, and
-          blurs the navigation entries it cannot.</p>
+          page enables only what that setup can actually support, and dims the
+          navigation entries it cannot.</p>
         <div class="table-wrap">
           <table class="reference-table">
             <thead>
               <tr>
                 <th scope="col">ID</th>
-                <th scope="col">Configuration</th>
+                <th scope="col">Setup</th>
                 <th scope="col">Available analysis</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td>0</td><td>Legacy / unknown</td><td>Live, history, records and CSV. Power analysis only if a record explicitly marks VSTOR valid.</td></tr>
-              <tr><td>1</td><td>Bare XIAO + USB</td><td>MCU die temperature and regulated VDD. No storage plane to analyse.</td></tr>
-              <tr><td>2</td><td>Bare XIAO + external</td><td>MCU die temperature and VDD. VSTOR is not observable without the HAT divider.</td></tr>
-              <tr><td>3</td><td>HAT + USB</td><td>Ambient temperature, humidity and lux. VSTOR is deliberately invalidated while USB powered.</td></tr>
-              <tr><td>4</td><td>HAT + external</td><td>Everything, including storage and harvest analysis.</td></tr>
+              <tr><td>0</td><td>Legacy / unknown</td><td>Live readings, history, tables and CSV export. Solar analysis only if valid storage readings exist.</td></tr>
+              <tr><td>1</td><td>Basic sensor + USB</td><td>Internal chip temperature and supply voltage. No energy store to analyse.</td></tr>
+              <tr><td>2</td><td>Basic sensor + external power</td><td>Internal chip temperature and supply voltage. Stored energy cannot be measured without the sensor board.</td></tr>
+              <tr><td>3</td><td>Sensor board + USB</td><td>Ambient temperature, humidity and light. Storage readings are turned off while on USB power.</td></tr>
+              <tr><td>4</td><td>Sensor board + solar/battery</td><td>Everything, including stored energy and solar analysis.</td></tr>
             </tbody>
           </table>
         </div>
-        <p>VSTOR is accepted only within <strong>1500–4500 mV</strong>. The
-          sensor, the bridge and this page all enforce the same band, so an
-          implausible reading is rejected at the first stage that sees it.</p>
+        <p>Storage voltage readings are accepted only between
+          <strong>1.5 V and 4.5 V</strong>. The sensor, the receiver and this
+          page all apply the same limit, so an implausible reading is rejected
+          at the first stage that sees it.</p>
       </article>
 
       <article class="card reference-card">
         <h2>Credits</h2>
         <div class="credits">
           <p class="credit-name">Brian Chirio</p>
-          <p class="credit-role">Developer of the complete system — sensor
-            firmware, bridge firmware, wire protocol, hardware integration and
-            this web application.</p>
-          <p class="credit-role">BSc Electrical Engineering, Tampere
-            University.</p>
+          <p class="credit-role">Creator of the project.</p>
           <hr>
-          <p class="credit-role">Developed for the <strong>Hybrid Solar Cells
-            (HSC)</strong> research group, led by <strong>Paola Vivo</strong>.</p>
+          <p class="credit-role">Developed for the
+            <a href="https://research.tuni.fi/hsc/" target="_blank" rel="noopener"><strong>Hybrid Solar Cells (HSC)</strong> research group</a>
+            at Tampere University, led by
+            <a href="https://scholar.google.com/citations?user=9RCrOeQAAAAJ&amp;hl=en" target="_blank" rel="noopener"><strong>Paola Vivo</strong></a>.</p>
         </div>
         <h3>Built with</h3>
-        <p>Zephyr RTOS on the sensor, the Adafruit nRF52 / Bluefruit core on the
-          bridge, BTHome v2 for the advertisement encoding, Web Bluetooth for
-          the phone link, and Chart.js for the plots. Chart.js is served from
-          this same origin, so the page works with no internet connection and
-          contacts no third party.</p>
+        <p>The sensor and receiver run on open-source embedded software, the
+          phone link uses Bluetooth, and the plots are drawn with Chart.js.
+          Chart.js is served from this same site, so the page works with no
+          internet connection and contacts no third party.</p>
         <h3>Privacy</h3>
-        <p>Measurements travel from the bridge to this page over Bluetooth and
-          stay in the browser. The static host serves the page and never
-          receives any data. Only your capacitance and regression-window
-          settings are stored locally, on this device.</p>
+        <p>Measurements travel from the receiver to this page over Bluetooth and
+          stay in your browser. The website serves only the page itself and
+          never receives any data. Only your two calculation settings are stored
+          locally, on this device.</p>
       </article>
     </div>
   </main>
@@ -1586,45 +1788,49 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     const ANALYTICS_SETTINGS_KEY = 'hsc-tplus.analytics.v3';
     // Settings saved under the previous product name are migrated once.
     const LEGACY_ANALYTICS_SETTINGS_KEY = 'tempbridge.analytics.v3';
+    const THEME_SETTINGS_KEY = 'hsc-tplus.theme';
     const DARK_THRESHOLDS_LUX = Object.freeze([1, 3, 5]);
     const DEFAULT_CHART_WINDOW_MS = 60 * 60 * 1000;
     const CHART_POSITION_STEPS = 1000;
     const CHART_PAN_FRACTION = 0.8;
     const CHART_GAP_MINIMUM_MS = 5 * 60 * 1000;
+    const SIMULATION_INTERVAL_MS = 3 * 60 * 1000;
+    const SIMULATION_DURATION_MS = 24 * 60 * 60 * 1000;
+    const SIMULATION_CAPACITANCE_F = 1;
 
     const CONFIGURATIONS = Object.freeze({
       0: Object.freeze({
         short: 'Legacy',
         name: 'Legacy/unknown',
-        detail: 'Older or unidentified sensor advertisement. LIVE, history, tables, and CSV remain available.',
+        detail: 'Older or unidentified sensor. Live readings, history, tables, and CSV export remain available.',
         hat: false,
         bare: false
       }),
       1: Object.freeze({
-        short: 'Bare + USB',
-        name: 'Bare + USB',
-        detail: 'Bare XIAO powered by USB. MCU die temperature and regulated VDD are available.',
+        short: 'Basic + USB',
+        name: 'Basic sensor + USB',
+        detail: 'Basic sensor powered over USB. Internal chip temperature and supply voltage are available.',
         hat: false,
         bare: true
       }),
       2: Object.freeze({
-        short: 'Bare + external',
-        name: 'Bare + external power (CJMCU expected)',
-        detail: 'Bare XIAO on external power. VSTOR is not observable without the Logger HAT.',
+        short: 'Basic + external',
+        name: 'Basic sensor + external power',
+        detail: 'Basic sensor on external power. Stored energy cannot be measured without the sensor board.',
         hat: false,
         bare: true
       }),
       3: Object.freeze({
-        short: 'HAT + USB',
-        name: 'HAT + USB',
-        detail: 'Ambient conditions are available. USB deliberately invalidates VSTOR and storage-power analysis.',
+        short: 'Board + USB',
+        name: 'Sensor board + USB',
+        detail: 'Ambient conditions are available. While on USB power, stored-energy readings are turned off.',
         hat: true,
         bare: false
       }),
       4: Object.freeze({
-        short: 'HAT + external',
-        name: 'HAT + external power/CJMCU',
-        detail: 'Ambient conditions and valid VSTOR samples support storage-plane power analysis.',
+        short: 'Board + solar',
+        name: 'Sensor board + solar/battery',
+        detail: 'Full readings, including stored energy voltage for solar energy analysis.',
         hat: true,
         bare: false
       })
@@ -1699,6 +1905,12 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       hatFields: Array.from(document.querySelectorAll('.hat-field')),
       hatColumns: Array.from(document.querySelectorAll('.hat-column')),
       configBanner: document.querySelector('#configBanner'),
+      themeColor: document.querySelector('meta[name="theme-color"]'),
+      themeToggle: document.querySelector('#themeToggle'),
+      themeToggleText: document.querySelector('#themeToggleText'),
+      simulationToggle: document.querySelector('#simulationToggle'),
+      simulationToggleText: document.querySelector('#simulationToggleText'),
+      simulationStatus: document.querySelector('#simulationStatus'),
       navFeedback: document.querySelector('#navFeedback'),
       navButtons: Array.from(document.querySelectorAll('.nav-item')),
       viewElements: Object.fromEntries(
@@ -1753,6 +1965,9 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     };
     let chartDrag = null;
     let navFeedbackTimer = 0;
+    let currentTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    let simulationActive = false;
+    let simulationSnapshot = null;
 
     // ---- View navigation ---------------------------------------------------
     // Only the active view is in the layout, so no section can lengthen the
@@ -1795,6 +2010,303 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
           ui.navFeedback.hidden = true;
         }, 5000);
       }
+    }
+
+    function chartThemeColors() {
+      return currentTheme === 'light'
+        ? Object.freeze({
+            legend: '#34465d',
+            axis: '#56667a',
+            grid: 'rgba(71, 85, 105, 0.14)',
+            border: 'rgba(71, 85, 105, 0.28)'
+          })
+        : Object.freeze({
+            legend: '#b5c1d3',
+            axis: '#94a3b8',
+            grid: 'rgba(148, 163, 184, 0.08)',
+            border: 'rgba(148, 163, 184, 0.22)'
+          });
+    }
+
+    function applyChartTheme(chart) {
+      if (!chart) return;
+      const colors = chartThemeColors();
+      const legendLabels = chart.options?.plugins?.legend?.labels;
+      if (legendLabels) legendLabels.color = colors.legend;
+      for (const scale of Object.values(chart.options?.scales || {})) {
+        if (scale.title) scale.title.color = colors.axis;
+        if (scale.ticks) scale.ticks.color = colors.axis;
+        if (scale.grid && scale.grid.drawOnChartArea !== false) {
+          scale.grid.color = colors.grid;
+        }
+        if (scale.border) scale.border.color = colors.border;
+      }
+    }
+
+    function refreshChartTheme() {
+      for (const chart of [historyChart, rawStorageChart, powerChart, harvestChart]) {
+        if (!chart) continue;
+        applyChartTheme(chart);
+        chart.update('none');
+      }
+    }
+
+    function setTheme(theme, { persist = true } = {}) {
+      currentTheme = theme === 'light' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = currentTheme;
+      const light = currentTheme === 'light';
+      ui.themeToggle.setAttribute('aria-checked', String(light));
+      ui.themeToggle.setAttribute('aria-label', light ? 'Use dark mode' : 'Use light mode');
+      ui.themeToggleText.textContent = light ? 'Light mode' : 'Dark mode';
+      ui.themeColor.content = light ? '#f3f6fa' : '#0a0f1a';
+      if (persist) {
+        try {
+          localStorage.setItem(THEME_SETTINGS_KEY, currentTheme);
+        } catch (_error) {
+          // The selected theme still applies for this visit.
+        }
+      }
+      refreshChartTheme();
+    }
+
+    function updateSimulationControl(message = null) {
+      ui.simulationToggle.setAttribute('aria-checked', String(simulationActive));
+      ui.simulationToggle.setAttribute(
+        'aria-label',
+        simulationActive ? 'End sample-data demo' : 'Start sample-data demo'
+      );
+      ui.simulationToggleText.textContent = simulationActive ? 'End demo' : 'Start demo';
+      ui.simulationStatus.textContent = message || (
+        simulationActive
+          ? 'Demo is active with one day of full-sensor readings.'
+          : 'Demo is off.'
+      );
+    }
+
+    function makeSimulationRecord(epochTs, seq, energyJ, daylight, lux) {
+      const voltageV = Math.sqrt((2 * energyJ) / SIMULATION_CAPACITANCE_F);
+      const voltageMv = Math.round(voltageV * 1000);
+      const hourWave = Math.sin((2 * Math.PI * (epochTs % 86400)) / 86400);
+      const tempCenti = Math.round((20.8 + 3.8 * daylight + 0.35 * hourWave) * 100);
+      const humidityCenti = Math.round((52 - 9 * daylight - 1.5 * hourWave) * 100);
+      const flags = FLAG_CLOCK_SYNCED |
+        ((4 << 1) & FLAG_CONFIG_MASK) |
+        FLAG_VSTOR_VALID |
+        FLAG_AMBIENT_TEMP;
+      return Object.freeze({
+        epochTs,
+        seq,
+        tempCenti,
+        tempC: tempCenti / 100,
+        voltageMv,
+        voltageV: voltageMv / 1000,
+        lux,
+        humidityCenti,
+        humidityPct: humidityCenti / 100,
+        rssi: -47 - (seq % 5),
+        flags,
+        clockSynced: true,
+        configId: 4,
+        vstorValid: true,
+        ambientTemperature: true
+      });
+    }
+
+    function generateSimulationRecords(nowMs = Date.now()) {
+      const intervalSeconds = SIMULATION_INTERVAL_MS / 1000;
+      const recordCount = Math.floor(SIMULATION_DURATION_MS / SIMULATION_INTERVAL_MS) + 1;
+      const endEpoch = Math.floor(nowMs / SIMULATION_INTERVAL_MS) * intervalSeconds;
+      const startEpoch = endEpoch - (recordCount - 1) * intervalSeconds;
+      const records = [];
+      let energyJ = 0.5 * SIMULATION_CAPACITANCE_F * 3.1 ** 2;
+      let previousNetPowerW = -18e-6;
+
+      for (let index = 0; index < recordCount; index += 1) {
+        if (index > 0) {
+          energyJ = Math.max(0.5, energyJ + previousNetPowerW * intervalSeconds);
+        }
+        const epochTs = startEpoch + index * intervalSeconds;
+        const date = new Date(epochTs * 1000);
+        const localHour = date.getHours() + date.getMinutes() / 60;
+        const daylightPhase = localHour > 7 && localHour < 19
+          ? Math.sin(Math.PI * (localHour - 7) / 12)
+          : 0;
+        const daylight = Math.max(0, daylightPhase);
+        // Keep daytime samples above the three dark-band thresholds so the
+        // demo has a clean, physically interpretable overnight baseline.
+        const lux = daylight > 0
+          ? Math.round(10 + 640 * daylight ** 1.35)
+          : 0;
+        const netPowerUw = -18 + 0.18 * lux + 0.35 * Math.sin(index / 11);
+        previousNetPowerW = netPowerUw * 1e-6;
+        records.push(makeSimulationRecord(
+          epochTs,
+          (20000 + index) & 0xffff,
+          energyJ,
+          daylight,
+          lux
+        ));
+      }
+      return records;
+    }
+
+    function simulationDataSelfTest() {
+      const records = generateSimulationRecords(Date.UTC(2026, 6, 24, 12, 0, 0));
+      const netPower = computeNetStoragePower(records, SIMULATION_CAPACITANCE_F, 45);
+      const inference = estimateDarkBaseline(netPower.points, 45, DARK_THRESHOLDS_LUX);
+      const harvest = estimateHarvestPoints(netPower.points, inference.baselineUw);
+      return runNamedTests([
+        ['one complete day', () => {
+          testAssert(records.length === 481, `expected 481 inclusive samples, got ${records.length}`);
+          testAssert(records.at(-1).epochTs - records[0].epochTs === 86400,
+            'demo does not span exactly 24 hours');
+        }],
+        ['full sensor configuration', () => {
+          testAssert(records.every((record) =>
+            record.configId === 4 &&
+            record.vstorValid &&
+            record.ambientTemperature &&
+            Number.isFinite(record.humidityPct) &&
+            Number.isFinite(record.lux)
+          ), 'demo contains a reading without full-sensor fields');
+        }],
+        ['safe stored-voltage range', () => {
+          testAssert(records.every((record) =>
+            record.voltageV >= 1.5 && record.voltageV <= 4.5
+          ), 'demo generated an out-of-range stored voltage');
+        }],
+        ['power and harvest available', () => {
+          testAssert(netPower.points.length > 400, 'too few net-power estimates');
+          testAssert(Number.isFinite(inference.baselineUw) && inference.baselineUw > 0,
+            'darkness baseline is unavailable');
+          testAssert(harvest.some((point) => point.powerUw > 20),
+            'demo has no positive solar-harvest period');
+        }]
+      ]);
+    }
+
+    function captureSimulationSnapshot() {
+      return Object.freeze({
+        records: Object.freeze(Array.from(recordsByIdentity.values())),
+        historyInitialized,
+        latestLiveRecord,
+        latestStatus,
+        lastBridgeRecordCount,
+        currentConfigId,
+        currentSampleIntervalMs,
+        chartView: Object.freeze({ ...chartView }),
+        syncProgress: ui.syncProgress.textContent
+      });
+    }
+
+    function resetLiveDisplay(caption = 'Connect to see the latest sample.') {
+      latestLiveRecord = null;
+      ui.temperatureValue.textContent = '--.--';
+      ui.voltageValue.textContent = '—';
+      ui.humidityValue.textContent = '—';
+      ui.luxValue.textContent = '—';
+      ui.sequenceValue.textContent = '—';
+      ui.rssiValue.textContent = '—';
+      ui.temperatureHeading.textContent = 'Current temperature';
+      ui.voltageLabel.textContent = 'Voltage';
+      ui.liveCaption.textContent = caption;
+    }
+
+    function startSimulation() {
+      if (simulationActive) return true;
+      if (isConnected() || ble.connecting || ble.disconnecting || activeSync || activeErase) {
+        showError('Disconnect from the receiver and finish any active operation before starting the demo.');
+        updateSimulationControl('Demo could not start while a real receiver is active.');
+        return false;
+      }
+
+      simulationSnapshot = captureSimulationSnapshot();
+      simulationActive = true;
+      clearError();
+      ui.featureNotice.textContent = '';
+      ui.featureNotice.classList.remove('visible');
+      recordsByIdentity.clear();
+      historyRecords = [];
+      historyVersion += 1;
+
+      const records = generateSimulationRecords();
+      mergeRecords(records);
+      historyInitialized = true;
+      latestLiveRecord = records.at(-1);
+      latestStatus = Object.freeze({
+        recordCount: records.length,
+        lastSampleAgeS: 0,
+        lastRssi: latestLiveRecord.rssi,
+        flags: FLAG_CLOCK_SYNCED,
+        fwVersion: PROTOCOL_VERSION,
+        configId: 4,
+        sampleIntervalMs: SIMULATION_INTERVAL_MS
+      });
+      lastBridgeRecordCount = records.length;
+      chartView = {
+        durationMs: DEFAULT_CHART_WINDOW_MS,
+        endMs: null,
+        followingLatest: true
+      };
+
+      renderStatus(latestStatus);
+      renderLive(latestLiveRecord, 'read');
+      ui.configurationName.textContent = 'Full sensor board + BQ25570 · Demo';
+      ui.configurationDetail.textContent =
+        'Simulated full configuration with ambient sensing, valid stored-energy voltage, and solar analysis.';
+      ui.statusConfiguration.textContent = 'Full + solar';
+      ui.liveCaption.textContent = 'Simulated current reading from a complete 24-hour data set.';
+      ui.syncProgress.textContent =
+        `Demo loaded · ${records.length.toLocaleString()} readings · 24 hours · no Bluetooth used`;
+      setConnectionState('connected', 'Demo · Full sensor + BQ25570');
+      updateSimulationControl();
+      renderHistory();
+      flushRenderNow();
+      updateButtonStates();
+      return true;
+    }
+
+    function restoreSimulationSnapshot(snapshot) {
+      recordsByIdentity.clear();
+      for (const record of snapshot.records) {
+        mergeRecordIntoStore(recordsByIdentity, record);
+      }
+      sortHistoryRecords();
+      historyInitialized = snapshot.historyInitialized;
+      latestLiveRecord = snapshot.latestLiveRecord;
+      latestStatus = snapshot.latestStatus;
+      lastBridgeRecordCount = snapshot.lastBridgeRecordCount;
+      chartView = { ...snapshot.chartView };
+
+      if (latestStatus) {
+        renderStatus(latestStatus);
+      } else {
+        resetStatusDisplay();
+        updateConfigurationDisplay(
+          snapshot.currentConfigId,
+          snapshot.currentSampleIntervalMs
+        );
+      }
+      if (latestLiveRecord) {
+        renderLive(latestLiveRecord, 'read');
+      } else {
+        resetLiveDisplay('Connect to see the latest sample.');
+      }
+      ui.syncProgress.textContent = snapshot.syncProgress;
+    }
+
+    function stopSimulation() {
+      if (!simulationActive) return;
+      const snapshot = simulationSnapshot || captureSimulationSnapshot();
+      simulationActive = false;
+      simulationSnapshot = null;
+      restoreSimulationSnapshot(snapshot);
+      setConnectionState('idle', 'Not connected');
+      updateSimulationControl('Demo ended. Your previous in-memory readings were restored.');
+      renderHistory();
+      flushRenderNow();
+      detectBluetoothSupport();
+      updateButtonStates();
     }
 
     function setActiveView(id, { force = false } = {}) {
@@ -2050,7 +2562,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       if (ArrayBuffer.isView(value)) {
         return new DataView(value.buffer, value.byteOffset, value.byteLength);
       }
-      throw new TypeError('Expected binary data from the bridge.');
+      throw new TypeError('Expected binary data from the receiver.');
     }
 
     function parseRecord(value, offset = 0) {
@@ -2099,8 +2611,8 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       const view = asDataView(value);
       if (view.byteLength !== STATUS_BYTES) {
         throw new RangeError(
-          `Protocol mismatch: this app requires the ${STATUS_BYTES}-byte Protocol v${PROTOCOL_VERSION} STATUS, ` +
-          `but the bridge returned ${view.byteLength} bytes. Upgrade the bridge and webapp together.`
+          'The receiver sent data in an unexpected format. ' +
+          'Please update the receiver and this app together.'
         );
       }
 
@@ -2116,8 +2628,8 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
 
       if (status.fwVersion !== PROTOCOL_VERSION) {
         throw new RangeError(
-          `Protocol mismatch: this app requires bridge firmware v${PROTOCOL_VERSION}, ` +
-          `but the bridge reports v${status.fwVersion}. No time sync or record parsing was attempted.`
+          `This app requires receiver software v${PROTOCOL_VERSION}, but the receiver ` +
+          `reports v${status.fwVersion}. Please update the receiver and this app together.`
         );
       }
       return status;
@@ -2280,7 +2792,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       const name = error && error.name ? error.name : 'Error';
       const detail = error && error.message ? error.message : String(error);
 
-      if (name === 'NotFoundError') return 'No bridge was selected.';
+      if (name === 'NotFoundError') return 'No receiver was selected.';
       if (name === 'SecurityError') return `Bluetooth permission or secure-context error: ${detail}`;
       if (name === 'NetworkError') return `Bluetooth connection error: ${detail}`;
       if (name === 'NotSupportedError') return `This Bluetooth operation is not supported: ${detail}`;
@@ -2290,18 +2802,22 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     function updateButtonStates() {
       const supported = 'bluetooth' in navigator && window.isSecureContext;
       const connected = isConnected();
+      const demo = simulationActive;
       const syncing = Boolean(activeSync);
       const erasing = Boolean(activeErase);
       const transitioning = ble.connecting || ble.disconnecting;
 
-      ui.connectButton.disabled = !supported || transitioning || connected || syncing || erasing;
-      ui.disconnectButton.disabled = !connected || transitioning;
-      ui.syncButton.disabled = !connected || transitioning || syncing || erasing;
-      ui.eraseButton.disabled = !connected || transitioning || syncing || erasing;
+      ui.connectButton.disabled =
+        demo || !supported || transitioning || connected || syncing || erasing;
+      ui.disconnectButton.disabled = (!connected && !demo) || transitioning;
+      ui.syncButton.disabled = demo || !connected || transitioning || syncing || erasing;
+      ui.eraseButton.disabled = demo || !connected || transitioning || syncing || erasing;
       // Export is local-only and remains useful after the bridge disconnects.
       ui.exportButton.disabled = syncing || erasing || historyRecords.length === 0;
 
-      if (ble.connecting) {
+      if (demo) {
+        ui.connectButton.textContent = 'Demo active';
+      } else if (ble.connecting) {
         ui.connectButton.textContent = 'Connecting…';
       } else if (connected) {
         ui.connectButton.textContent = 'Connected';
@@ -2310,7 +2826,11 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       } else {
         ui.connectButton.textContent = 'Connect';
       }
-      ui.disconnectButton.textContent = ble.disconnecting ? 'Disconnecting…' : 'Disconnect';
+      ui.disconnectButton.textContent = demo
+        ? 'End demo'
+        : ble.disconnecting
+          ? 'Disconnecting…'
+          : 'Disconnect';
 
       if (syncing) {
         ui.syncButton.textContent = `Syncing… ${activeSync.received}`;
@@ -2345,18 +2865,18 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       return CONFIGURATIONS[id] || Object.freeze({
         short: `Unknown ${id}`,
         name: `Unknown configuration (${id})`,
-        detail: 'The sensor reported an unrecognized configuration. Raw records remain available, but capability assumptions are disabled.',
+        detail: 'The sensor reported an unrecognized setup. Raw readings remain available, but advanced analysis is disabled.',
         hat: false,
         bare: false
       });
     }
 
     function recordTemperatureSource(record) {
-      return record.ambientTemperature ? 'Ambient' : 'MCU die';
+      return record.ambientTemperature ? 'Ambient' : 'Internal';
     }
 
     function recordVoltageKind(record) {
-      return record.vstorValid ? 'VSTOR' : 'VDD';
+      return record.vstorValid ? 'Stored' : 'Supply';
     }
 
     function formatNullable(value, suffix = '', digits = null) {
@@ -2495,7 +3015,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       ui.rssiValue.textContent = '—';
       ui.temperatureHeading.textContent = 'Current temperature';
       ui.voltageLabel.textContent = 'Voltage';
-      ui.liveCaption.textContent = 'Waiting for a current sample from this bridge.';
+      ui.liveCaption.textContent = 'Waiting for a current reading from this receiver.';
       ui.syncProgress.textContent = message;
       renderHistory();
     }
@@ -2842,7 +3362,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
               yAxisID: 'temperature'
             },
             {
-              label: 'VDD (V)',
+              label: 'Supply voltage (V)',
               data: [],
               parsing: false,
               borderColor: '#65a9ff',
@@ -2937,6 +3457,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
           }
         }
       });
+      applyChartTheme(historyChart);
     }
 
     function renderChart() {
@@ -2992,7 +3513,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       const vddData = buildVisibleSeries(
         historyRecords,
         viewport,
-        (record) => recordVoltageKind(record) === 'VDD' ? record.voltageV : null,
+        (record) => recordVoltageKind(record) === 'Supply' ? record.voltageV : null,
         gapThresholdMs,
         visibleStart,
         visibleEnd
@@ -3047,7 +3568,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         data: {
           datasets: [
             {
-              label: 'VSTOR (V)',
+              label: 'Stored voltage (V)',
               data: [],
               parsing: false,
               borderColor: '#65a9ff',
@@ -3077,6 +3598,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
           lux: linearAxis('right', 'lux', false, { suggestedMin: 0 })
         })
       });
+      applyChartTheme(rawStorageChart);
     }
 
     let rawChartRenderedVersion = -1;
@@ -3116,7 +3638,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       ui.rawChartFallback.classList.toggle('visible', empty);
       ui.rawChartFallback.textContent = historyRecords.length === 0
         ? 'Sync history to populate the chart.'
-        : 'No timestamped VSTOR-valid or illuminance samples are available.';
+        : 'No timestamped stored-voltage or light readings are available.';
       rawStorageChart.update('none');
       rawChartRenderedVersion = historyVersion;
     }
@@ -3214,30 +3736,30 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         storage: {
           available: !ui.rawStorageSection.hidden,
           reason: !detected
-            ? 'Connect to detect the sensor configuration.'
+            ? 'Connect to detect the sensor setup.'
             : config.bare
-              ? 'Needs the Logger HAT — this sensor is running bare.'
-              : 'No ambient or storage samples have been received yet.'
+              ? 'Needs the full sensor board, but this sensor is running without one.'
+              : 'No ambient or storage readings have been received yet.'
         },
         power: {
           available: !ui.powerSection.hidden,
           reason: !detected
-            ? 'Connect to detect the sensor configuration.'
+            ? 'Connect to detect the sensor setup.'
             : config.bare
-              ? 'Needs the Logger HAT — VSTOR is not observable on a bare XIAO.'
-              : 'No record carries a valid VSTOR reading yet.'
+              ? 'Needs the full sensor board to measure stored energy.'
+              : 'No valid stored-energy readings have been received yet.'
         }
       };
       applyNavAvailability();
 
       ui.chartTitle.textContent = showHat
         ? 'Temperature and humidity history'
-        : 'Temperature and VDD history';
+        : 'Temperature and supply voltage history';
       ui.chartCanvas.setAttribute(
         'aria-label',
         showHat
           ? 'Temperature and humidity history chart'
-          : 'Temperature and regulated VDD history chart'
+          : 'Temperature and supply voltage history chart'
       );
       if (latestLiveRecord && latestLiveRecord.configId === currentConfigId) {
         ui.temperatureHeading.textContent =
@@ -3247,9 +3769,9 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         ui.temperatureHeading.textContent = config.hat
           ? 'Current ambient temperature'
           : config.bare
-            ? 'Current MCU die temperature'
+            ? 'Current internal temperature'
             : 'Current temperature';
-        ui.voltageLabel.textContent = config.hat ? 'VSTOR' : 'VDD';
+        ui.voltageLabel.textContent = config.hat ? 'Stored voltage' : 'Supply voltage';
       }
     }
 
@@ -3307,24 +3829,24 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       const requested = ble.disconnecting;
       ble.disconnecting = false;
       ble.connectionGeneration += 1;
-      abortActiveSync(new Error('The bridge disconnected during history sync.'));
-      abortActiveErase(new Error('The bridge disconnected during history erase.'));
+      abortActiveSync(new Error('The receiver disconnected during history sync.'));
+      abortActiveErase(new Error('The receiver disconnected during history erase.'));
       disarmErase();
       clearGattState();
       if (ble.protocolFailureMessage) {
         const message = ble.protocolFailureMessage;
         ble.protocolFailureMessage = null;
-        setConnectionState('error', 'Protocol mismatch');
-        ui.liveCaption.textContent = 'Connection closed because the bridge protocol changed.';
+        setConnectionState('error', 'Incompatible receiver');
+        ui.liveCaption.textContent = 'Connection closed because the receiver software is incompatible.';
         showError(message);
       } else if (requested) {
         clearError();
         setConnectionState('idle', 'Disconnected');
-        ui.liveCaption.textContent = 'Disconnected. Tap Reconnect to use the same bridge.';
+        ui.liveCaption.textContent = 'Disconnected. Tap Reconnect to use the same receiver.';
       } else {
         setConnectionState('error', `${ble.device.name || BRIDGE_FALLBACK_NAME} disconnected`);
-        ui.liveCaption.textContent = 'Connection lost. Tap Reconnect to use the same bridge.';
-        showError('The Bluetooth connection was lost. Move closer to the bridge and tap Reconnect.');
+        ui.liveCaption.textContent = 'Connection lost. Tap Reconnect to use the same receiver.';
+        showError('The Bluetooth connection was lost. Move closer to the receiver and tap Reconnect.');
       }
       updateButtonStates();
     }
@@ -3408,7 +3930,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       // A lower retained count indicates that the bridge restarted or its
       // retained history was cleared. Reset the incremental epoch boundary.
       if (lastBridgeRecordCount !== null && status.recordCount < lastBridgeRecordCount) {
-        resetHeldHistory('Bridge restart detected; local history was reset.');
+        resetHeldHistory('Receiver restart detected; local history was reset.');
       }
       lastBridgeRecordCount = status.recordCount;
       renderStatus(status);
@@ -3422,18 +3944,18 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     function handleStatusNotification(event) {
       try {
         if (!ble.protocolValidated) {
-          throw new Error('Received STATUS before the Protocol v3 gate completed.');
+          throw new Error('Received status data before the compatibility check completed.');
         }
         const status = parseStatus(event.target.value);
         applyValidatedStatus(status);
       } catch (error) {
-        const message = `STATUS notification rejected. ${describeError(error)}`;
+        const message = `The receiver reported a problem. ${describeError(error)}`;
         ble.protocolValidated = false;
         ble.ready = false;
         ble.protocolFailureMessage = message;
         abortActiveSync(new Error(message));
         abortActiveErase(new Error(message));
-        setConnectionState('error', 'Protocol mismatch');
+        setConnectionState('error', 'Incompatible receiver');
         showError(message);
         updateButtonStates();
         if (ble.device && ble.device.gatt && ble.device.gatt.connected) {
@@ -3443,7 +3965,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     }
 
     async function readAndRenderStatus() {
-      if (!ble.characteristics) throw new Error('Bridge characteristics are unavailable.');
+      if (!ble.characteristics) throw new Error('The receiver connection is not ready.');
       const value = await ble.characteristics.status.readValue();
       const status = parseStatus(value);
       applyValidatedStatus(status);
@@ -3496,7 +4018,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
 
     async function connect() {
       if (!('bluetooth' in navigator) || !window.isSecureContext ||
-          ble.connecting || ble.disconnecting || isConnected()) return;
+          simulationActive || ble.connecting || ble.disconnecting || isConnected()) return;
 
       clearError();
       ble.protocolFailureMessage = null;
@@ -3517,7 +4039,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
           ble.device = selectedDevice;
           ble.pickerOnNextAttempt = false;
           ble.device.addEventListener('gattserverdisconnected', handleDisconnected);
-          if (changedDevice) resetHeldHistory('A different bridge was selected; local history was reset.');
+          if (changedDevice) resetHeldHistory('A different receiver was selected; local history was reset.');
         }
 
         const generation = ++ble.connectionGeneration;
@@ -3526,7 +4048,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         await initializeGatt(server, generation);
 
         if (generation !== ble.connectionGeneration || !server.connected) {
-          throw new Error('Bridge disconnected while finishing setup.');
+          throw new Error('The receiver disconnected while finishing setup.');
         }
 
         ble.ready = true;
@@ -3544,7 +4066,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         // A failed same-device retry gets one-click access to the picker next time.
         if (useExistingDevice) ble.pickerOnNextAttempt = true;
         setConnectionState('error', 'Connection failed');
-        showError(`${detail}${useExistingDevice ? ' Tap Connect again to choose a bridge.' : ''}`);
+        showError(`${detail}${useExistingDevice ? ' Tap Connect again to choose a receiver.' : ''}`);
       } finally {
         ble.connecting = false;
         updateButtonStates();
@@ -3552,6 +4074,10 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     }
 
     function disconnect() {
+      if (simulationActive) {
+        stopSimulation();
+        return;
+      }
       if (!isConnected() || ble.connecting || ble.disconnecting) return;
 
       clearError();
@@ -3602,7 +4128,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
 
       activeSync = sync;
       ui.syncProgress.textContent = sinceEpoch === 0
-        ? 'Requesting all bridge history…'
+        ? 'Requesting all stored history…'
         : `Requesting records after ${new Date((sinceEpoch - 1) * 1000).toLocaleString()}…`;
       setConnectionState('busy', 'Syncing history…');
       updateButtonStates();
@@ -3703,7 +4229,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         erase.watchdog = window.setTimeout(() => {
           if (activeErase !== erase || erase.settled) return;
           erase.settled = true;
-          erase.reject(new Error('Bridge did not confirm an empty history within 10 seconds.'));
+          erase.reject(new Error('The receiver did not confirm an empty history within 10 seconds.'));
         }, ERASE_TIMEOUT_MS);
 
         await writeCharacteristic(
@@ -3712,7 +4238,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         );
         // The browser keeps history only in memory. Clear it once the command
         // is accepted locally, then wait for authoritative STATUS count 0.
-        resetHeldHistory('Waiting for bridge erase confirmation…');
+        resetHeldHistory('Waiting for the receiver to confirm the erase…');
         await completion;
         erase.completed = true;
         lastBridgeRecordCount = 0;
@@ -3720,7 +4246,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
       } catch (error) {
         showError(`History erase failed. ${describeError(error)}`);
         ui.syncProgress.textContent =
-          'Erase was not confirmed. Sync history to check the bridge.';
+          'Erase was not confirmed. Sync history to check the receiver.';
       } finally {
         window.clearTimeout(erase.watchdog);
         if (activeErase === erase) activeErase = null;
@@ -4517,7 +5043,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
           type: 'line',
           data: {
             datasets: [{
-              label: 'Estimated panel harvest into VSTOR (µW)',
+              label: 'Estimated solar harvest (µW)',
               data: [],
               parsing: false,
               borderColor: '#ffcc66',
@@ -4534,6 +5060,8 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
           })
         });
       }
+      applyChartTheme(powerChart);
+      applyChartTheme(harvestChart);
     }
 
     function renderCandidateCards(inference) {
@@ -4620,18 +5148,18 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
 
       if (currentConfigId === 3) {
         ui.powerAvailability.textContent = hasVstorRecords
-          ? 'USB is present now, so current VSTOR is deliberately invalid. Historical VSTOR-valid records remain eligible.'
-          : 'USB is present, so firmware deliberately marks VSTOR invalid and storage-power analysis is unavailable.';
+          ? 'The sensor is on USB power right now, so live stored-energy readings are paused. Earlier valid readings are still used.'
+          : 'The sensor is on USB power, so stored-energy readings are paused and solar analysis is unavailable.';
       } else if (currentConfigId === 0 && !hasVstorRecords) {
         ui.powerAvailability.textContent =
-          'Legacy/unknown records remain usable for LIVE, history, tables, and CSV, but no record explicitly carries the VSTOR-valid flag.';
+          'These readings can be viewed and exported, but none of them includes a valid stored-energy measurement.';
       } else if (!hasVstorRecords) {
         ui.powerAvailability.textContent = historyRecords.length === 0
-          ? 'Sync timestamped history to calculate storage-plane power.'
-          : 'No timestamped record has a valid VSTOR value. Invalid or VDD readings are excluded.';
+          ? 'Sync the history to calculate solar energy figures.'
+          : 'No reading includes a valid stored-energy measurement yet.';
       } else if (result.points.length === 0) {
         ui.powerAvailability.textContent =
-          'Valid VSTOR samples exist, but each regression needs at least six points without a gap above three times the measured median spacing.';
+          'Valid readings exist, but each calculation needs at least six of them in a row without a large gap.';
       } else {
         ui.powerAvailability.textContent =
           `Net storage power uses ${analyticsSettings.capacitanceF} F and a trailing ` +
@@ -4691,6 +5219,13 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     }
 
     function detectBluetoothSupport() {
+      if (simulationActive) {
+        ui.featureNotice.textContent = '';
+        ui.featureNotice.classList.remove('visible');
+        setConnectionState('connected', 'Demo · Full sensor + BQ25570');
+        updateButtonStates();
+        return;
+      }
       if (!window.isSecureContext) {
         ui.featureNotice.textContent = 'Web Bluetooth requires HTTPS, such as GitHub Pages, or a localhost development URL. A plain HTTP LAN address is not secure.';
         ui.featureNotice.classList.add('visible');
@@ -4717,6 +5252,13 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     ui.syncButton.addEventListener('click', syncHistory);
     ui.exportButton.addEventListener('click', exportCsv);
     ui.eraseButton.addEventListener('click', eraseHistory);
+    ui.themeToggle.addEventListener('click', () => {
+      setTheme(currentTheme === 'light' ? 'dark' : 'light');
+    });
+    ui.simulationToggle.addEventListener('click', () => {
+      if (simulationActive) stopSimulation();
+      else startSimulation();
+    });
     ui.capacitanceInput.addEventListener('change', updateAnalyticsSettings);
     ui.regressionWindowInput.addEventListener('change', updateAnalyticsSettings);
     for (const button of ui.chartWindowButtons) {
@@ -4752,6 +5294,7 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
     window.chartNavigationSelfTest = chartNavigationSelfTest;
     window.powerMathSelfTest = powerMathSelfTest;
     window.inferenceMathSelfTest = inferenceMathSelfTest;
+    window.simulationDataSelfTest = simulationDataSelfTest;
     window.hscSensorSelfTest = () => {
       // Renders are coalesced into animation frames, so settle any pending one
       // before reporting: release QA should never read a half-applied UI.
@@ -4760,7 +5303,8 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
         protocol: protocolSelfTest(),
         chart: chartNavigationSelfTest(),
         power: powerMathSelfTest(),
-        inference: inferenceMathSelfTest()
+        inference: inferenceMathSelfTest(),
+        simulation: simulationDataSelfTest()
       });
     };
     // Retained so the name documented for earlier releases still works.
@@ -4786,6 +5330,8 @@ A single-slope summary of the cell's indoor response, not a calibration.</span><
 
     // Charts are built on first reveal, not here: a canvas inside a hidden
     // view has no measurable box for Chart.js to size against.
+    setTheme(currentTheme, { persist: false });
+    updateSimulationControl();
     setActiveView(DEFAULT_VIEW, { force: true });
     // Blur the hardware-gated entries on first paint rather than a frame later.
     applyNavAvailability();
