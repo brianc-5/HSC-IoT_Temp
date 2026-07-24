@@ -17,7 +17,8 @@ measurements and power analysis supported by that configuration. The bridge
 and page accept arbitrary sensor cadences without source changes. History opens
 in a one-hour view with 30-minute, 1-hour, 2-hour, 6-hour, 12-hour, and full
 retention choices; use the scrubber, Older/Newer buttons, or drag the chart
-horizontally to move through time.
+horizontally to move through time. Bare-mode history displays both temperature
+and VDD by default.
 
 The page talks directly to the bridge over BLE; GitHub only hosts the static
 HTML and does not receive the sensor measurements.
