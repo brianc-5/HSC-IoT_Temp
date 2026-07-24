@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0a0f1a">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="HSC T+ Sensor: a phone-friendly dashboard for a solar-powered environmental sensor with live readings, measurement history, CSV export, and solar energy analysis.">
+  <meta name="description" content="HSC T+ Sensor: a phone-friendly dashboard for an indoor-photovoltaic environmental sensor with live readings, measurement history, CSV export, and harvested-energy analysis.">
   <title>HSC T+ Sensor</title>
 
   <!-- Production hosting: GitHub Pages or another HTTPS static host. -->
@@ -19,8 +19,12 @@
       if (localStorage.getItem('hsc-tplus.theme') === 'light') {
         document.documentElement.dataset.theme = 'light';
       }
+      const savedLanguage = localStorage.getItem('hsc-tplus.language');
+      if (['en', 'fi', 'it', 'zh', 'de', 'sv', 'fr'].includes(savedLanguage)) {
+        document.documentElement.lang = savedLanguage === 'zh' ? 'zh-CN' : savedLanguage;
+      }
     } catch (_error) {
-      // Theme selection still works for this visit when storage is unavailable.
+      // Theme and language selection still work for this visit when storage is unavailable.
     }
   </script>
 
@@ -563,6 +567,69 @@
       justify-content: space-between;
       gap: 20px;
       margin-bottom: 24px;
+      padding-right: 78px;
+    }
+
+    .language-picker {
+      position: fixed;
+      z-index: 24;
+      top: max(14px, env(safe-area-inset-top));
+      right: max(14px, env(safe-area-inset-right));
+      display: inline-flex;
+      height: 38px;
+      align-items: center;
+      gap: 5px;
+      padding: 0 7px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--nav-bg);
+      box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    .language-picker svg {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: var(--accent-strong);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.7;
+    }
+
+    .language-picker select {
+      width: 39px;
+      height: 34px;
+      padding: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 750;
+      cursor: pointer;
+      appearance: none;
+      text-align: center;
+      text-align-last: center;
+    }
+
+    .language-picker select:focus-visible {
+      border-radius: 7px;
+      outline: 3px solid rgb(101 169 255 / 0.35);
+      outline-offset: 1px;
+    }
+
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      overflow: hidden !important;
+      clip: rect(0 0 0 0) !important;
+      clip-path: inset(50%) !important;
+      white-space: nowrap !important;
     }
 
     h1,
@@ -1249,6 +1316,22 @@
   </style>
 </head>
 <body>
+  <label class="language-picker" for="languageSelect">
+    <span class="visually-hidden">Language</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"></path>
+    </svg>
+    <select id="languageSelect" aria-label="Language">
+      <option value="en">EN</option>
+      <option value="fi">FI</option>
+      <option value="it">IT</option>
+      <option value="zh">ZH</option>
+      <option value="de">DE</option>
+      <option value="sv">SV</option>
+      <option value="fr">FR</option>
+    </select>
+  </label>
   <main>
     <header>
       <h1>HSC <span>T+</span> Sensor</h1>
@@ -1377,10 +1460,10 @@
     <div id="view-power" class="view" hidden>
     <section id="powerSection" class="card history-card" aria-labelledby="powerTitle" hidden>
       <div class="section-heading">
-        <h2 id="powerTitle" class="estimated-label">Estimated solar energy collected</h2>
+        <h2 id="powerTitle" class="estimated-label">Estimated indoor photovoltaic energy</h2>
         <span class="record-count">Experimental estimate</span>
       </div>
-      <p id="powerAvailability" class="analysis-note">Solar energy analysis is not available for this sensor setup.</p>
+      <p id="powerAvailability" class="analysis-note">Harvested-energy analysis is not available for this sensor setup.</p>
 
       <div class="settings-grid" aria-label="Power calculation settings">
         <div class="setting">
@@ -1420,8 +1503,8 @@
       </div>
 
       <div class="chart-wrap compact-chart">
-        <canvas id="harvestChart" aria-label="Estimated solar harvest chart"></canvas>
-        <p id="harvestChartFallback" class="chart-fallback">A stable darkness baseline is needed before solar harvest can be estimated.</p>
+        <canvas id="harvestChart" aria-label="Estimated harvested-power chart"></canvas>
+        <p id="harvestChartFallback" class="chart-fallback">A stable darkness baseline is needed before harvested power can be estimated.</p>
       </div>
 
       <h3 class="subsection-heading">Estimated daily energy</h3>
@@ -1519,7 +1602,7 @@
         <div class="pipeline">
           <div class="pipeline-stage">
             <span>Stage 1 · Sensor</span>
-            <strong>Solar-powered sensor</strong>
+            <strong>Indoor photovoltaic-powered sensor</strong>
             <small>A small, low-power device that wakes at a set interval,
               measures temperature, humidity, light level and the voltage of its
               energy store, broadcasts one short radio message, and goes back to
@@ -1595,9 +1678,9 @@ Spacing comes from the actual reading timestamps, never from an assumed interval
           power, and implausible values, are excluded rather than rescaled.</p>
 
         <h3>2 · Power use in darkness</h3>
-        <p>The energy store only ever shows the <em>net</em> of solar energy
+        <p>The energy store only ever shows the net of photovoltaic energy
           coming in and the sensor's own consumption going out. In darkness,
-          however, no solar energy comes in, so whatever the store loses is the
+          however, no photovoltaic energy comes in, so whatever the store loses is the
           system's own consumption:</p>
         <div class="formula">P_drain ≈ median( −P_net )<span class="annot">…over every estimate taken when the measured light level was below a threshold.
 The median is used, not the mean, so a few odd samples cannot skew the result.</span></div>
@@ -1619,16 +1702,16 @@ that neither is affected by stray light.</span></div>
           In that case the page reports the baseline as unavailable rather than
           silently substituting zero.</p>
 
-        <h3>3 · Solar energy collected</h3>
-        <p>Once the darkness baseline is accepted, the solar energy collected is
+        <h3>3 · Indoor photovoltaic energy collected</h3>
+        <p>Once the darkness baseline is accepted, the photovoltaic energy collected is
           the net rate plus what the system was consuming at the same time:</p>
-        <div class="formula">P_harvest = max(0, P_net + P_drain)<span class="annot">The lower limit of zero encodes a physical fact: a solar cell cannot deliver negative power.</span></div>
+        <div class="formula">P_harvest = max(0, P_net + P_drain)<span class="annot">The lower limit of zero encodes a physical fact: a photovoltaic cell cannot deliver negative power.</span></div>
         <p><strong>Assumption:</strong> the system consumes roughly the same
           power in light and in darkness. This is the weakest link in the chain,
-          and the reason every solar figure on this page is labelled
+          and the reason every harvested-energy figure on this page is labelled
           estimated.</p>
         <p><strong>What it measures:</strong> the power actually delivered
-          <em>into</em> the energy store, not the raw output at the solar
+          into the energy store, not the raw output at the photovoltaic
           cell's terminals, since some power is lost along the way.</p>
 
         <h3>4 · How harvest responds to light</h3>
@@ -1667,11 +1750,11 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
               </tr>
             </thead>
             <tbody>
-              <tr><td>0</td><td>Legacy / unknown</td><td>Live readings, history, tables and CSV export. Solar analysis only if valid storage readings exist.</td></tr>
+              <tr><td>0</td><td>Legacy / unknown</td><td>Live readings, history, tables and CSV export. Harvested-energy analysis is available only if valid storage readings exist.</td></tr>
               <tr><td>1</td><td>Basic sensor + USB</td><td>Internal chip temperature and supply voltage. No energy store to analyse.</td></tr>
               <tr><td>2</td><td>Basic sensor + external power</td><td>Internal chip temperature and supply voltage. Stored energy cannot be measured without the sensor board.</td></tr>
               <tr><td>3</td><td>Sensor board + USB</td><td>Ambient temperature, humidity and light. Storage readings are turned off while on USB power.</td></tr>
-              <tr><td>4</td><td>Sensor board + solar/battery</td><td>Everything, including stored energy and solar analysis.</td></tr>
+              <tr><td>4</td><td>Sensor board + energy harvester</td><td>Everything, including stored energy and indoor photovoltaic analysis.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1754,6 +1837,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       document.head.appendChild(chartFallback);
     }
   </script>
+  <script src="i18n.js"></script>
   <script>
     'use strict';
 
@@ -1789,6 +1873,13 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
     // Settings saved under the previous product name are migrated once.
     const LEGACY_ANALYTICS_SETTINGS_KEY = 'tempbridge.analytics.v3';
     const THEME_SETTINGS_KEY = 'hsc-tplus.theme';
+    const LANGUAGE_SETTINGS_KEY = 'hsc-tplus.language';
+    const I18N = window.HSC_I18N || Object.freeze({
+      languages: Object.freeze(['en']),
+      localeCodes: Object.freeze({ en: 'en' }),
+      normalize: (value) => String(value ?? '').replace(/\s+/g, ' ').trim(),
+      translate: (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
+    });
     const DARK_THRESHOLDS_LUX = Object.freeze([1, 3, 5]);
     const DEFAULT_CHART_WINDOW_MS = 60 * 60 * 1000;
     const CHART_POSITION_STEPS = 1000;
@@ -1828,9 +1919,9 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
         bare: false
       }),
       4: Object.freeze({
-        short: 'Board + solar',
-        name: 'Sensor board + solar/battery',
-        detail: 'Full readings, including stored energy voltage for solar energy analysis.',
+        short: 'Board + harvesting',
+        name: 'Sensor board + energy harvester',
+        detail: 'Full readings, including stored-energy voltage for harvested-power analysis.',
         hat: true,
         bare: false
       })
@@ -1905,7 +1996,9 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       hatFields: Array.from(document.querySelectorAll('.hat-field')),
       hatColumns: Array.from(document.querySelectorAll('.hat-column')),
       configBanner: document.querySelector('#configBanner'),
+      metaDescription: document.querySelector('meta[name="description"]'),
       themeColor: document.querySelector('meta[name="theme-color"]'),
+      languageSelect: document.querySelector('#languageSelect'),
       themeToggle: document.querySelector('#themeToggle'),
       themeToggleText: document.querySelector('#themeToggleText'),
       simulationToggle: document.querySelector('#simulationToggle'),
@@ -1966,8 +2059,149 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
     let chartDrag = null;
     let navFeedbackTimer = 0;
     let currentTheme = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+    let currentLanguage = I18N.languages.includes(document.documentElement.lang)
+      ? document.documentElement.lang
+      : document.documentElement.lang.startsWith('zh')
+        ? 'zh'
+        : 'en';
     let simulationActive = false;
     let simulationSnapshot = null;
+
+    // ---- Localisation ------------------------------------------------------
+    // English remains the source language in the HTML and application code.
+    // Each text node keeps that source in a WeakMap, which lets dynamic DOM
+    // updates and repeated language switches preserve values and markup.
+    const localizedTextState = new WeakMap();
+    const localizedAttributeState = new WeakMap();
+    let localizationQueued = false;
+    let localizationObserver = null;
+
+    function localeCode() {
+      return I18N.localeCodes[currentLanguage] || 'en';
+    }
+
+    function t(source) {
+      return I18N.translate(source, currentLanguage);
+    }
+
+    function splitTextWhitespace(value) {
+      const match = String(value).match(/^(\s*)([\s\S]*?)(\s*)$/);
+      return {
+        prefix: match?.[1] || '',
+        source: I18N.normalize(match?.[2] || ''),
+        suffix: match?.[3] || ''
+      };
+    }
+
+    function localizeTextNode(node) {
+      if (!node?.parentElement ||
+          ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(node.parentElement.tagName)) return;
+      const currentValue = node.nodeValue || '';
+      let state = localizedTextState.get(node);
+      if (!state || currentValue !== state.lastRendered) {
+        const parsed = splitTextWhitespace(currentValue);
+        if (!parsed.source) return;
+        state = { ...parsed, lastRendered: currentValue };
+        localizedTextState.set(node, state);
+      }
+      const translated = t(state.source);
+      const rendered = `${state.prefix}${translated}${state.suffix}`;
+      state.lastRendered = rendered;
+      if (currentValue !== rendered) node.nodeValue = rendered;
+    }
+
+    function localizeAttribute(element, attribute) {
+      if (!element.hasAttribute(attribute)) return;
+      const currentValue = element.getAttribute(attribute) || '';
+      let states = localizedAttributeState.get(element);
+      if (!states) {
+        states = new Map();
+        localizedAttributeState.set(element, states);
+      }
+      let state = states.get(attribute);
+      if (!state || currentValue !== state.lastRendered) {
+        state = {
+          source: I18N.normalize(currentValue),
+          lastRendered: currentValue
+        };
+        states.set(attribute, state);
+      }
+      const rendered = t(state.source);
+      state.lastRendered = rendered;
+      if (currentValue !== rendered) element.setAttribute(attribute, rendered);
+    }
+
+    function localizeDocument() {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) localizeTextNode(walker.currentNode);
+      for (const element of document.body.querySelectorAll('[aria-label], [title]')) {
+        localizeAttribute(element, 'aria-label');
+        localizeAttribute(element, 'title');
+      }
+    }
+
+    function queueLocalization() {
+      if (localizationQueued) return;
+      localizationQueued = true;
+      window.queueMicrotask(() => {
+        localizationQueued = false;
+        localizeDocument();
+      });
+    }
+
+    function startLocalizationObserver() {
+      if (localizationObserver) return;
+      localizationObserver = new MutationObserver(queueLocalization);
+      localizationObserver.observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['aria-label', 'title']
+      });
+    }
+
+    function refreshChartLanguage() {
+      for (const chart of [historyChart, rawStorageChart, powerChart, harvestChart]) {
+        if (!chart) continue;
+        for (const dataset of chart.data?.datasets || []) {
+          if (!dataset.i18nSourceLabel) dataset.i18nSourceLabel = dataset.label;
+          dataset.label = t(dataset.i18nSourceLabel);
+        }
+        for (const scale of Object.values(chart.options?.scales || {})) {
+          if (!scale.title?.text) continue;
+          if (!scale.title.i18nSourceText) scale.title.i18nSourceText = scale.title.text;
+          scale.title.text = t(scale.title.i18nSourceText);
+        }
+        chart.update('none');
+      }
+    }
+
+    function setLanguage(language, { persist = true } = {}) {
+      currentLanguage = I18N.languages.includes(language) ? language : 'en';
+      document.documentElement.lang = I18N.localeCodes[currentLanguage] || currentLanguage;
+      ui.languageSelect.value = currentLanguage;
+      if (ui.metaDescription) {
+        ui.metaDescription.content = t(
+          'HSC T+ Sensor: a phone-friendly dashboard for an indoor-photovoltaic environmental sensor with live readings, measurement history, CSV export, and harvested-energy analysis.'
+        );
+      }
+      if (persist) {
+        try {
+          localStorage.setItem(LANGUAGE_SETTINGS_KEY, currentLanguage);
+        } catch (_error) {
+          // The selected language still applies for this visit.
+        }
+      }
+      rebuildLocaleFormatters();
+      if (latestStatus) renderStatus(latestStatus);
+      updateButtonStates();
+      updateSimulationControl();
+      scheduleRender(RENDER_EVERYTHING);
+      flushRenderNow();
+      refreshChartLanguage();
+      localizeDocument();
+    }
 
     // ---- View navigation ---------------------------------------------------
     // Only the active view is in the layout, so no section can lengthen the
@@ -1975,12 +2209,12 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
     // whose capability is missing keeps its navigation entry visible but
     // blurred and inert, so the reason stays discoverable.
     const VIEWS = Object.freeze([
-      Object.freeze({ id: 'live', requires: null, showsConfigBanner: true }),
-      Object.freeze({ id: 'history', requires: null, showsConfigBanner: true }),
-      Object.freeze({ id: 'storage', requires: 'storage', showsConfigBanner: true }),
-      Object.freeze({ id: 'power', requires: 'power', showsConfigBanner: true }),
-      Object.freeze({ id: 'records', requires: null, showsConfigBanner: true }),
-      Object.freeze({ id: 'reference', requires: null, showsConfigBanner: false })
+      Object.freeze({ id: 'live', label: 'Live', requires: null, showsConfigBanner: true }),
+      Object.freeze({ id: 'history', label: 'History', requires: null, showsConfigBanner: true }),
+      Object.freeze({ id: 'storage', label: 'Storage', requires: 'storage', showsConfigBanner: true }),
+      Object.freeze({ id: 'power', label: 'Power', requires: 'power', showsConfigBanner: true }),
+      Object.freeze({ id: 'records', label: 'Records', requires: null, showsConfigBanner: true }),
+      Object.freeze({ id: 'reference', label: 'Reference', requires: null, showsConfigBanner: false })
     ]);
     const DEFAULT_VIEW = 'live';
 
@@ -2180,7 +2414,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
           testAssert(Number.isFinite(inference.baselineUw) && inference.baselineUw > 0,
             'darkness baseline is unavailable');
           testAssert(harvest.some((point) => point.powerUw > 20),
-            'demo has no positive solar-harvest period');
+            'demo has no positive harvested-power period');
         }]
       ]);
     }
@@ -2195,7 +2429,8 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
         currentConfigId,
         currentSampleIntervalMs,
         chartView: Object.freeze({ ...chartView }),
-        syncProgress: ui.syncProgress.textContent
+        syncProgress: localizedTextState.get(ui.syncProgress.firstChild)?.source ||
+          ui.syncProgress.textContent
       });
     }
 
@@ -2253,11 +2488,11 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       renderLive(latestLiveRecord, 'read');
       ui.configurationName.textContent = 'Full sensor board + BQ25570 · Demo';
       ui.configurationDetail.textContent =
-        'Simulated full configuration with ambient sensing, valid stored-energy voltage, and solar analysis.';
-      ui.statusConfiguration.textContent = 'Full + solar';
+        'Simulated full configuration with ambient sensing, valid stored-energy voltage, and harvested-power analysis.';
+      ui.statusConfiguration.textContent = 'Full + harvesting';
       ui.liveCaption.textContent = 'Simulated current reading from a complete 24-hour data set.';
       ui.syncProgress.textContent =
-        `Demo loaded · ${records.length.toLocaleString()} readings · 24 hours · no Bluetooth used`;
+        `Demo loaded · ${formatInteger(records.length)} readings · 24 hours · no Bluetooth used`;
       setConnectionState('connected', 'Demo · Full sensor + BQ25570');
       updateSimulationControl();
       renderHistory();
@@ -2359,8 +2594,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
           : viewCapabilities[view.requires].reason;
         if (reason) {
           button.title = reason;
-          const label = button.querySelector('.nav-label')?.textContent || 'View';
-          button.setAttribute('aria-label', `${label}. Unavailable: ${reason}`);
+          button.setAttribute('aria-label', `${view?.label || 'View'}. Unavailable: ${reason}`);
         } else {
           button.removeAttribute('title');
           button.removeAttribute('aria-label');
@@ -2421,6 +2655,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       if ((flags & RENDER_RAW_CHART) !== 0) renderRawStorageChart();
       if ((flags & RENDER_ANALYTICS) !== 0) renderAnalytics();
       updateButtonStates();
+      queueLocalization();
     }
 
     // Forces any pending frame to run now. Used by the console self-tests and
@@ -2523,38 +2758,49 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       return low;
     }
 
-    // Cached Intl formatters. toLocaleString()/toLocaleTimeString() build a new
-    // formatter on every call, and axis ticks and tooltips call them per point.
-    const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+    // Cached formatters are rebuilt when the selected language changes.
+    let dateTimeFormatter;
+    let clockFormatter;
+    let dayClockFormatter;
+    let tooltipFormatter;
+    let integerFormatter;
 
-    const clockFormatter = new Intl.DateTimeFormat([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    function rebuildLocaleFormatters() {
+      const locale = localeCode();
+      dateTimeFormatter = new Intl.DateTimeFormat(locale, {
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      clockFormatter = new Intl.DateTimeFormat(locale, {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      dayClockFormatter = new Intl.DateTimeFormat(locale, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      tooltipFormatter = new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric'
+      });
+      integerFormatter = new Intl.NumberFormat(locale, {
+        maximumFractionDigits: 0
+      });
+    }
+    rebuildLocaleFormatters();
 
-    const dayClockFormatter = new Intl.DateTimeFormat([], {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    // These options are exactly what Date.prototype.toLocaleString() applies
-    // when it is called without any, so tooltip text is unchanged.
-    const tooltipFormatter = new Intl.DateTimeFormat([], {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric'
-    });
+    function formatInteger(value) {
+      return integerFormatter.format(Number(value));
+    }
 
     function asDataView(value) {
       if (value instanceof DataView) return value;
@@ -2914,7 +3160,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
 
     function renderStatus(status) {
       latestStatus = status;
-      ui.statusRecords.textContent = status.recordCount.toLocaleString();
+      ui.statusRecords.textContent = formatInteger(status.recordCount);
       ui.statusAge.textContent = formatAge(status.lastSampleAgeS);
       ui.statusRssi.textContent = status.recordCount === 0 ? '—' : `${status.lastRssi} dBm`;
       ui.statusClock.textContent = (status.flags & 0x01) !== 0 ? 'Synced' : 'Unsynced';
@@ -2935,9 +3181,9 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       ui.luxValue.textContent = formatNullable(record.lux, ' lux', 0);
       ui.sequenceValue.textContent = record.seq.toString();
       ui.rssiValue.textContent = `${record.rssi} dBm`;
-      const arrival = new Date().toLocaleTimeString();
+      const arrival = clockFormatter.format(new Date());
       const sampleTime = record.epochTs > 0
-        ? ` · sampled ${new Date(record.epochTs * 1000).toLocaleTimeString()}`
+        ? ` · sampled ${clockFormatter.format(record.epochTs * 1000)}`
         : ' · timestamp unsynced';
       ui.liveCaption.textContent = `${source === 'read' ? 'Read' : 'Arrived'} at ${arrival}${sampleTime}`;
       // updateConfigurationDisplay above already scheduled RENDER_CAPABILITIES
@@ -3068,7 +3314,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
 
     function renderRecentRecordsTable() {
       const total = historyRecords.length;
-      ui.recordCount.textContent = `${total.toLocaleString()} ${total === 1 ? 'record' : 'records'} held`;
+      ui.recordCount.textContent = `${formatInteger(total)} ${total === 1 ? 'record' : 'records'} held`;
 
       if (total === 0) {
         if (recentRowsAttached !== 0 || emptyHistoryRow === null) {
@@ -3412,7 +3658,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
                 title(items) {
                   if (items.length === 0) return '';
                   const epochMs = items[0].parsed.x;
-                  return epochMs === 0 ? 'Unsynced timestamp' : tooltipFormatter.format(epochMs);
+                  return epochMs === 0 ? t('Unsynced timestamp') : tooltipFormatter.format(epochMs);
                 }
               }
             }
@@ -3458,6 +3704,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
         }
       });
       applyChartTheme(historyChart);
+      refreshChartLanguage();
     }
 
     function renderChart() {
@@ -3550,7 +3797,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       historyChart.options.scales.x.max = viewport?.endMs;
       updateChartNavigation(viewport);
       if (viewport) {
-        ui.chartRange.textContent = `${formatChartRange(viewport)} · ${visibleRecordCount.toLocaleString()} ${visibleRecordCount === 1 ? 'sample' : 'samples'}`;
+        ui.chartRange.textContent = `${formatChartRange(viewport)} · ${formatInteger(visibleRecordCount)} ${visibleRecordCount === 1 ? 'sample' : 'samples'}`;
       }
       historyChart.update('none');
     }
@@ -3599,6 +3846,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
         })
       });
       applyChartTheme(rawStorageChart);
+      refreshChartLanguage();
     }
 
     let rawChartRenderedVersion = -1;
@@ -3917,7 +4165,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
           mergeRecordIntoStore(sync.recordsByIdentity, record);
         }
         sync.received += count;
-        ui.syncProgress.textContent = `Receiving history · ${sync.received.toLocaleString()} records received`;
+        ui.syncProgress.textContent = `Receiving history · ${formatInteger(sync.received)} records received`;
         updateButtonStates();
       } catch (error) {
         sync.settled = true;
@@ -4129,7 +4377,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       activeSync = sync;
       ui.syncProgress.textContent = sinceEpoch === 0
         ? 'Requesting all stored history…'
-        : `Requesting records after ${new Date((sinceEpoch - 1) * 1000).toLocaleString()}…`;
+        : `Requesting records after ${tooltipFormatter.format((sinceEpoch - 1) * 1000)}…`;
       setConnectionState('busy', 'Syncing history…');
       updateButtonStates();
 
@@ -4164,10 +4412,10 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
         }
       } catch (error) {
         if (sync.cancelledByDisconnect) {
-          ui.syncProgress.textContent = `Sync cancelled after ${sync.received.toLocaleString()} records; partial data was not merged.`;
+          ui.syncProgress.textContent = `Sync cancelled after ${formatInteger(sync.received)} records; partial data was not merged.`;
         } else {
           showError(`History sync failed. ${describeError(error)}`);
-          ui.syncProgress.textContent = `Sync interrupted after ${sync.received.toLocaleString()} records; partial data was not merged.`;
+          ui.syncProgress.textContent = `Sync interrupted after ${formatInteger(sync.received)} records; partial data was not merged.`;
         }
       } finally {
         window.clearTimeout(sync.watchdog);
@@ -4181,7 +4429,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
           );
           renderHistory();
           const changed = Math.max(0, recordsByIdentity.size - sync.heldBefore);
-          ui.syncProgress.textContent = `Sync complete · ${sync.received.toLocaleString()} received · ${changed.toLocaleString()} new · ${historyRecords.length.toLocaleString()} total`;
+          ui.syncProgress.textContent = `Sync complete · ${formatInteger(sync.received)} received · ${formatInteger(changed)} new · ${formatInteger(historyRecords.length)} total`;
         }
         if (activeSync === sync) activeSync = null;
         if (isConnected()) {
@@ -4198,7 +4446,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
         eraseArmed = true;
         const count = latestStatus?.recordCount ?? historyRecords.length;
         ui.eraseButton.textContent =
-          `Click again to erase ${count.toLocaleString()} records permanently`;
+          `Click again to erase ${formatInteger(count)} records permanently`;
         eraseArmTimer = window.setTimeout(disarmErase, ERASE_CONFIRMATION_MS);
         return;
       }
@@ -5043,7 +5291,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
           type: 'line',
           data: {
             datasets: [{
-              label: 'Estimated solar harvest (µW)',
+              label: 'Estimated harvested power (µW)',
               data: [],
               parsing: false,
               borderColor: '#ffcc66',
@@ -5062,6 +5310,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       }
       applyChartTheme(powerChart);
       applyChartTheme(harvestChart);
+      refreshChartLanguage();
     }
 
     function renderCandidateCards(inference) {
@@ -5141,7 +5390,7 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       const hasVstorRecords = result.sourceSampleCount > 0;
       const latestPoint = result.points.at(-1);
       ui.latestNetPower.textContent = latestPoint ? `${latestPoint.powerUw.toFixed(1)} µW` : '—';
-      ui.validPowerCount.textContent = result.points.length.toLocaleString();
+      ui.validPowerCount.textContent = formatInteger(result.points.length);
       ui.medianSpacing.textContent = Number.isFinite(result.spacingS)
         ? formatDurationSeconds(result.spacingS)
         : '—';
@@ -5149,13 +5398,13 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
       if (currentConfigId === 3) {
         ui.powerAvailability.textContent = hasVstorRecords
           ? 'The sensor is on USB power right now, so live stored-energy readings are paused. Earlier valid readings are still used.'
-          : 'The sensor is on USB power, so stored-energy readings are paused and solar analysis is unavailable.';
+          : 'The sensor is on USB power, so stored-energy readings are paused and harvested-energy analysis is unavailable.';
       } else if (currentConfigId === 0 && !hasVstorRecords) {
         ui.powerAvailability.textContent =
           'These readings can be viewed and exported, but none of them includes a valid stored-energy measurement.';
       } else if (!hasVstorRecords) {
         ui.powerAvailability.textContent = historyRecords.length === 0
-          ? 'Sync the history to calculate solar energy figures.'
+          ? 'Sync the history to calculate harvested-energy figures.'
           : 'No reading includes a valid stored-energy measurement yet.';
       } else if (result.points.length === 0) {
         ui.powerAvailability.textContent =
@@ -5255,6 +5504,9 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
     ui.themeToggle.addEventListener('click', () => {
       setTheme(currentTheme === 'light' ? 'dark' : 'light');
     });
+    ui.languageSelect.addEventListener('change', () => {
+      setLanguage(ui.languageSelect.value);
+    });
     ui.simulationToggle.addEventListener('click', () => {
       if (simulationActive) stopSimulation();
       else startSimulation();
@@ -5337,6 +5589,8 @@ A single-number summary of the cell's indoor response, not a calibration.</span>
     applyNavAvailability();
     renderHistory();
     resetStatusDisplay();
+    startLocalizationObserver();
+    setLanguage(currentLanguage, { persist: false });
     detectBluetoothSupport();
   </script>
 </body>
