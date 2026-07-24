@@ -282,6 +282,13 @@
       color: var(--accent-strong);
     }
 
+    button.danger {
+      grid-column: 1 / -1;
+      border-color: rgb(255 123 134 / 0.58);
+      background: rgb(255 123 134 / 0.1);
+      color: var(--danger);
+    }
+
     button:not(:disabled):active {
       transform: translateY(1px);
     }
@@ -757,6 +764,7 @@
             <button id="disconnectButton" type="button" disabled>Disconnect</button>
             <button id="syncButton" type="button" disabled>Sync history</button>
             <button id="exportButton" type="button" disabled>Export CSV</button>
+            <button id="eraseButton" class="danger" type="button" disabled>Erase history</button>
           </div>
           <p id="syncProgress" class="sync-progress" aria-live="polite">History has not been synced.</p>
         </article>
@@ -931,6 +939,9 @@
     const STATUS_BYTES = 16;
     const HISTORY_END_MARKER = 0xff;
     const HISTORY_REQUEST = 0x01;
+    const HISTORY_ERASE_ALL = 0x02;
+    const ERASE_CONFIRMATION_MS = 5000;
+    const ERASE_TIMEOUT_MS = 10000;
     const HISTORY_STALL_TIMEOUT_MS = 15000;
     const BRIDGE_RECORD_CAPACITY = 4096;
     const INVALID_TEMP_CENTI = -32768;
@@ -993,6 +1004,7 @@
       disconnectButton: document.querySelector('#disconnectButton'),
       syncButton: document.querySelector('#syncButton'),
       exportButton: document.querySelector('#exportButton'),
+      eraseButton: document.querySelector('#eraseButton'),
       syncProgress: document.querySelector('#syncProgress'),
       configurationName: document.querySelector('#configurationName'),
       configurationDetail: document.querySelector('#configurationDetail'),
@@ -1075,6 +1087,9 @@
     let historyInitialized = false;
     let latestLiveRecord = null;
     let activeSync = null;
+    let activeErase = null;
+    let eraseArmed = false;
+    let eraseArmTimer = 0;
     let historyChart = null;
     let rawStorageChart = null;
     let powerChart = null;
@@ -1192,6 +1207,13 @@
       return buffer;
     }
 
+    function eraseAllPayload() {
+      return Uint8Array.from([
+        HISTORY_ERASE_ALL,
+        0x45, 0x52, 0x41, 0x53
+      ]).buffer;
+    }
+
     function protocolSelfTest() {
       return runNamedTests([
         ['16-byte record and flags', () => {
@@ -1254,6 +1276,13 @@
             versionRejected = true;
           }
           testAssert(lengthRejected && versionRejected, 'STATUS gate accepted an incompatible bridge');
+        }],
+        ['exact erase-all control payload', () => {
+          const payload = Array.from(new Uint8Array(eraseAllPayload()));
+          testAssert(
+            payload.join(',') === '2,69,82,65,83',
+            `erase payload was ${payload.join(',')}`
+          );
         }],
         ['sequence-wrap identity and epoch patching', () => {
           const base = {
@@ -1332,13 +1361,15 @@
       const supported = 'bluetooth' in navigator && window.isSecureContext;
       const connected = isConnected();
       const syncing = Boolean(activeSync);
+      const erasing = Boolean(activeErase);
       const transitioning = ble.connecting || ble.disconnecting;
 
-      ui.connectButton.disabled = !supported || transitioning || connected || syncing;
+      ui.connectButton.disabled = !supported || transitioning || connected || syncing || erasing;
       ui.disconnectButton.disabled = !connected || transitioning;
-      ui.syncButton.disabled = !connected || transitioning || syncing;
+      ui.syncButton.disabled = !connected || transitioning || syncing || erasing;
+      ui.eraseButton.disabled = !connected || transitioning || syncing || erasing;
       // Export is local-only and remains useful after the bridge disconnects.
-      ui.exportButton.disabled = syncing || historyRecords.length === 0;
+      ui.exportButton.disabled = syncing || erasing || historyRecords.length === 0;
 
       if (ble.connecting) {
         ui.connectButton.textContent = 'Connecting…';
@@ -1356,6 +1387,7 @@
       } else {
         ui.syncButton.textContent = 'Sync history';
       }
+      if (!eraseArmed) ui.eraseButton.textContent = 'Erase history';
     }
 
     function formatAge(seconds) {
@@ -2163,12 +2195,29 @@
       activeSync.reject(error);
     }
 
+    function abortActiveErase(error) {
+      if (!activeErase || activeErase.settled) return;
+      activeErase.settled = true;
+      window.clearTimeout(activeErase.watchdog);
+      activeErase.reject(error);
+    }
+
+    function disarmErase() {
+      window.clearTimeout(eraseArmTimer);
+      eraseArmTimer = 0;
+      eraseArmed = false;
+      ui.eraseButton.textContent = 'Erase history';
+      updateButtonStates();
+    }
+
     function handleDisconnected(event) {
       if (event.target !== ble.device) return;
       const requested = ble.disconnecting;
       ble.disconnecting = false;
       ble.connectionGeneration += 1;
       abortActiveSync(new Error('The bridge disconnected during history sync.'));
+      abortActiveErase(new Error('The bridge disconnected during history erase.'));
+      disarmErase();
       clearGattState();
       if (ble.protocolFailureMessage) {
         const message = ble.protocolFailureMessage;
@@ -2271,6 +2320,11 @@
       }
       lastBridgeRecordCount = status.recordCount;
       renderStatus(status);
+      if (activeErase && !activeErase.settled && status.recordCount === 0) {
+        activeErase.settled = true;
+        window.clearTimeout(activeErase.watchdog);
+        activeErase.resolve();
+      }
     }
 
     function handleStatusNotification(event) {
@@ -2286,6 +2340,7 @@
         ble.ready = false;
         ble.protocolFailureMessage = message;
         abortActiveSync(new Error(message));
+        abortActiveErase(new Error(message));
         setConnectionState('error', 'Protocol mismatch');
         showError(message);
         updateButtonStates();
@@ -2509,6 +2564,75 @@
         if (activeSync === sync) activeSync = null;
         if (isConnected()) {
           setConnectionState('connected', `Connected to ${ble.device.name || 'TempBridge'}`);
+        }
+        updateButtonStates();
+      }
+    }
+
+    async function eraseHistory() {
+      if (!isConnected() || activeSync || activeErase) return;
+
+      if (!eraseArmed) {
+        eraseArmed = true;
+        const count = latestStatus?.recordCount ?? historyRecords.length;
+        ui.eraseButton.textContent =
+          `Click again to erase ${count.toLocaleString()} records permanently`;
+        eraseArmTimer = window.setTimeout(disarmErase, ERASE_CONFIRMATION_MS);
+        return;
+      }
+
+      window.clearTimeout(eraseArmTimer);
+      eraseArmTimer = 0;
+      eraseArmed = false;
+      clearError();
+
+      const erase = {
+        settled: false,
+        watchdog: 0,
+        resolve: null,
+        reject: null,
+        completed: false
+      };
+      const completion = new Promise((resolve, reject) => {
+        erase.resolve = resolve;
+        erase.reject = reject;
+      });
+      activeErase = erase;
+      ui.eraseButton.textContent = 'Erasing…';
+      ui.syncProgress.textContent = 'Erasing retained history…';
+      setConnectionState('busy', 'Erasing history…');
+      updateButtonStates();
+
+      try {
+        erase.watchdog = window.setTimeout(() => {
+          if (activeErase !== erase || erase.settled) return;
+          erase.settled = true;
+          erase.reject(new Error('Bridge did not confirm an empty history within 10 seconds.'));
+        }, ERASE_TIMEOUT_MS);
+
+        await writeCharacteristic(
+          ble.characteristics.histCtrl,
+          eraseAllPayload()
+        );
+        // The browser keeps history only in memory. Clear it once the command
+        // is accepted locally, then wait for authoritative STATUS count 0.
+        resetHeldHistory('Waiting for bridge erase confirmation…');
+        await completion;
+        erase.completed = true;
+        lastBridgeRecordCount = 0;
+        ui.syncProgress.textContent = 'History erased · 0 records';
+      } catch (error) {
+        showError(`History erase failed. ${describeError(error)}`);
+        ui.syncProgress.textContent =
+          'Erase was not confirmed. Sync history to check the bridge.';
+      } finally {
+        window.clearTimeout(erase.watchdog);
+        if (activeErase === erase) activeErase = null;
+        if (isConnected()) {
+          setConnectionState(
+            'connected',
+            `Connected to ${ble.device.name || 'TempBridge'}`
+          );
         }
         updateButtonStates();
       }
@@ -3374,6 +3498,7 @@
     ui.disconnectButton.addEventListener('click', disconnect);
     ui.syncButton.addEventListener('click', syncHistory);
     ui.exportButton.addEventListener('click', exportCsv);
+    ui.eraseButton.addEventListener('click', eraseHistory);
     ui.capacitanceInput.addEventListener('change', updateAnalyticsSettings);
     ui.regressionWindowInput.addEventListener('change', updateAnalyticsSettings);
     for (const button of ui.chartWindowButtons) {
